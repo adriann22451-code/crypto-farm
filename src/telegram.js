@@ -20,6 +20,10 @@ export function initTelegram() {
     const user = tg.initDataUnsafe?.user || null;
     window.__TG_USER__ = user;
     window.__TG_INIT_DATA__ = tg.initData || '';
+    // Present when the app was opened via a share/deep link like
+    // https://t.me/<bot>?startapp=<code> — used to auto-claim a referral
+    // code without the person having to type anything in.
+    window.__TG_START_PARAM__ = tg.initDataUnsafe?.start_param || null;
   } else {
     window.__TG_USER__ = null;
   }
