@@ -1,4 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { ICON_COIN, ICON_GEM, ICON_LIGHTNING, ICON_LOCK, ICON_STAR } from './icons.js';
+
+function Icon({ src, size = 14, style }) {
+  return <img src={src} alt="" style={{ width: size, height: size, objectFit: 'contain', display: 'inline-block', verticalAlign: 'middle', ...style }} />;
+}
 
 /* ================== Deterministic market simulation ==================
    Same function drives the ticker, every sparkline, AND prediction grading.
@@ -806,11 +811,11 @@ export default function KebunKripto() {
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <div style={{ ...styles.pill, color: '#E8C468' }}>
-              <span style={{ ...styles.dot, background: 'rgba(232,196,104,0.15)' }}>◆</span>
+              <span style={{ ...styles.dot, background: 'rgba(232,196,104,0.15)' }}><Icon src={ICON_COIN} size={11} /></span>
               {animatedCoins.toLocaleString('en-US')}
             </div>
             <div style={{ ...styles.pill, color: '#4AFFB0' }}>
-              <span style={{ ...styles.dot, background: 'rgba(74,255,176,0.15)' }}>✦</span>
+              <span style={{ ...styles.dot, background: 'rgba(74,255,176,0.15)' }}><Icon src={ICON_GEM} size={11} /></span>
               {animatedGems}
             </div>
           </div>
@@ -955,7 +960,7 @@ function Ticker({ now, marketEvents }) {
         <div className="kk-ticker-track" style={{ display: 'flex', gap: 22, fontFamily: "'IBM Plex Mono', monospace", fontSize: 11.5, whiteSpace: 'nowrap', width: 'max-content' }}>
           {[...items, ...items].map((t, i) => (
             <span key={i} style={{ color: t.event ? '#E8C468' : (t.up ? '#4AFFB0' : '#FF6B5C'), fontWeight: t.event ? 700 : 600 }}>
-              {t.event ? '⚡ ' : ''}{t.name} ${fmtPrice(t.price)} {t.up ? '+' : ''}{t.pct.toFixed(1)}%
+              {t.event && <Icon src={ICON_LIGHTNING} size={11} style={{ marginRight: 3 }} />}{t.name} ${fmtPrice(t.price)} {t.up ? '+' : ''}{t.pct.toFixed(1)}%
             </span>
           ))}
         </div>
@@ -1015,7 +1020,7 @@ function FarmScreen({ plots, predictions, now, streak, unlockedPlots, plotProgre
             const levelNeeded = LEVELS.find((l) => l.plots > plot.id)?.level ?? 6;
             return (
               <div key={plot.id} style={{ ...styles.plot, borderStyle: 'dashed', opacity: 0.45 }}>
-                <div style={{ fontSize: 20 }}>🔒</div>
+                <Icon src={ICON_LOCK} size={20} />
                 <div style={{ fontSize: 9, color: '#5C7268', marginTop: 4, textAlign: 'center' }}>Requires Level {levelNeeded}</div>
               </div>
             );
@@ -1204,7 +1209,9 @@ function WarehouseScreen({ tx, unlockedAchievements }) {
   return (
     <>
       <div style={styles.sectionHead}>
-        <div style={styles.sectionTitle}>Achievements</div>
+        <div style={{ ...styles.sectionTitle, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Icon src={ICON_STAR} size={18} /> Achievements
+        </div>
         <div style={styles.sectionMeta}>{unlockedCount} / {ACHIEVEMENTS.length}</div>
       </div>
       <div style={{ padding: '0 18px 10px', position: 'relative', zIndex: 2 }}>
@@ -1214,14 +1221,14 @@ function WarehouseScreen({ tx, unlockedAchievements }) {
             return (
               <div key={a.id} style={{ ...styles.listRow, borderTop: i > 0 ? '1px solid #223530' : 'none', opacity: unlocked ? 1 : 0.45 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ ...styles.rowIcon, background: unlocked ? 'rgba(74,255,176,0.12)' : '#182B25' }}>{unlocked ? a.icon : '🔒'}</div>
+                  <div style={{ ...styles.rowIcon, background: unlocked ? 'rgba(74,255,176,0.12)' : '#182B25' }}>{unlocked ? a.icon : <Icon src={ICON_LOCK} size={16} />}</div>
                   <div>
                     <div style={styles.rowTitle}>{a.name}</div>
                     <div style={styles.rowSub}>{a.desc}</div>
                   </div>
                 </div>
                 <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12.5, color: unlocked ? '#4AFFB0' : '#5C7268' }}>
-                  {unlocked ? '✓' : `+${a.reward}✦`}
+                  {unlocked ? '✓' : <>+{a.reward}<Icon src={ICON_GEM} size={11} style={{ marginLeft: 2 }} /></>}
                 </div>
               </div>
             );
@@ -1380,7 +1387,7 @@ function LeaderboardScreen({ profile, onClaim, showToast }) {
                       <div style={styles.rowSub}>Lv{r.level} · {r.referrals || 0} referrals</div>
                     </div>
                   </div>
-                  <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, color: '#E8C468' }}>◆ {r.coins.toLocaleString('en-US')}</div>
+                  <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, color: '#E8C468', display: 'flex', alignItems: 'center', gap: 4 }}><Icon src={ICON_COIN} size={13} /> {r.coins.toLocaleString('en-US')}</div>
                 </div>
               );
             })}
@@ -1513,8 +1520,9 @@ function PredictSheet({ crop, now, timeframe, leverage, onPickLeverage, insuranc
         </div>
 
         {activeEvent && (
-          <div style={styles.eventBadge}>
-            ⚡ Volatile right now — reward ×{eventMult.toFixed(1)} if locked in now ({fmtCountdown(activeEvent.endAt - now)} left)
+          <div style={{ ...styles.eventBadge, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Icon src={ICON_LIGHTNING} size={14} />
+            <span>Volatile right now — reward ×{eventMult.toFixed(1)} if locked in now ({fmtCountdown(activeEvent.endAt - now)} left)</span>
           </div>
         )}
 
@@ -1651,7 +1659,7 @@ function TopUpSheet({ onPick, payingPackage, onClose }) {
                 style={{ ...styles.topupCard, opacity: disabled ? 0.4 : 1, cursor: payingPackage ? 'default' : 'pointer' }}
               >
                 {p.badge && <div style={styles.topupBadge}>{p.badge}</div>}
-                <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 18, fontWeight: 600, color: '#E8C468' }}>◆ {p.coins.toLocaleString('en-US')}</div>
+                <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 18, fontWeight: 600, color: '#E8C468', display: 'flex', alignItems: 'center', gap: 5 }}><Icon src={ICON_COIN} size={17} /> {p.coins.toLocaleString('en-US')}</div>
                 <div style={{ fontSize: 10.5, color: '#8FA69C', marginTop: 3 }}>{p.note}</div>
                 <div style={{ fontSize: 12, color: '#4AFFB0', marginTop: 6, fontWeight: 600 }}>
                   {isPaying ? 'Opening…' : `⭐ ${p.stars}`}
