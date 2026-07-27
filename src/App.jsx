@@ -157,7 +157,16 @@ function defaultState() {
     marketEvents: [],
     stats: { totalPredictions: 0, totalCorrect: 0, bestStreak: 0, totalCoinsEarned: 0, eventWins: 0 },
     unlockedAchievements: [],
+    dailyLogin: { lastClaimDay: null, streak: 0 },
   };
+}
+
+function getDateKey(timeMs) {
+  const d = new Date(timeMs);
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+function getDailyBonusAmount(streak) {
+  return Math.min(20 + (streak - 1) * 15, 150);
 }
 
 const ACHIEVEMENTS = [
@@ -293,6 +302,8 @@ export default function KebunKripto() {
   const [loaded, setLoaded] = useState(false);
   const [profile, setProfile] = useState(null); // { playerId, nickname }
   const [claimedReferrals, setClaimedReferrals] = useState([]);
+  const autoClaimAttempted = useRef(false);
+  const dailyBonusChecked = useRef(false);
   const [screen, setScreen] = useState('kebun');
   const [now, setNow] = useState(Date.now());
   const animatedCoins = useCountUp(state.coins);
@@ -417,6 +428,48 @@ export default function KebunKripto() {
     }
     showToast('✓ Code claimed! +30 gems for you');
   }
+
+  // Daily login bonus: grants coins once per calendar day, bigger reward the
+  // more consecutive days in a row the person opens the app. Runs once per
+  // session, right after state finishes loading.
+  useEffect(() => {
+    if (!loaded || dailyBonusChecked.current) return;
+    dailyBonusChecked.current = true;
+
+    const now = Date.now();
+    const todayKey = getDateKey(now);
+    const yesterdayKey = getDateKey(now - 86400000);
+    const daily = state.dailyLogin || { lastClaimDay: null, streak: 0 };
+
+    if (daily.lastClaimDay === todayKey) return; // already claimed today
+
+    const newStreak = daily.lastClaimDay === yesterdayKey ? daily.streak + 1 : 1;
+    const bonus = getDailyBonusAmount(newStreak);
+
+    setState((s) => ({
+      ...s,
+      coins: s.coins + bonus,
+      dailyLogin: { lastClaimDay: todayKey, streak: newStreak },
+      tx: [
+        { icon: '📅', title: `Daily login bonus · Day ${newStreak}`, value: `+${bonus}`, dir: 'in', time: 'Just now' },
+        ...s.tx,
+      ].slice(0, 20),
+    }));
+    showToast(`📅 Daily bonus! Day ${newStreak} streak · +${bonus} coins`);
+  }, [loaded]);
+
+  // If the app was opened via a shared deep link (t.me/<bot>?startapp=CODE),
+  // auto-claim that code once — no typing required on the friend's end.
+  useEffect(() => {
+    if (!loaded || !profile || autoClaimAttempted.current) return;
+    const startParam = window.__TG_START_PARAM__;
+    if (startParam && startParam !== profile.playerId && !claimedReferrals.includes(startParam)) {
+      autoClaimAttempted.current = true;
+      claimReferral(startParam);
+    } else {
+      autoClaimAttempted.current = true;
+    }
+  }, [loaded, profile, claimedReferrals]);
 
   const showToast = useCallback((msg) => {
     setToast(msg);
@@ -552,14 +605,56 @@ export default function KebunKripto() {
     return { pct, ready: pct >= 100, crop };
   }
 
-  function topUp(amount) {
-    setState((s) => ({
-      ...s,
-      coins: s.coins + amount,
-      tx: [{ icon: '💳', title: `Top up ${amount.toLocaleString('en-US')} coins`, value: `+${amount}`, dir: 'in', time: 'Just now' }, ...s.tx].slice(0, 20),
-    }));
-    setWalletSheet(null);
-    showToast(`✓ ${amount.toLocaleString('en-US')} coins added`);
+  const [payingPackage, setPayingPackage] = useState(null);
+
+  async function buyWithStars(packageKey) {
+    if (!profile) return;
+    setPayingPackage(packageKey);
+    try {
+      const res = await fetch('/api/create-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: profile.playerId, packageKey }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.link) {
+        showToast('✗ Could not start payment, try again');
+        setPayingPackage(null);
+        return;
+      }
+      const tg = window.Telegram?.WebApp;
+      if (!tg?.openInvoice) {
+        showToast('✗ Payments only work inside Telegram');
+        setPayingPackage(null);
+        return;
+      }
+      tg.openInvoice(data.link, async (status) => {
+        setPayingPackage(null);
+        if (status === 'paid') {
+          showToast('✓ Payment received! Updating your balance…');
+          // The webhook is the one that actually credited the coins — pull
+          // the freshly updated state back down instead of trusting the
+          // client to know the new balance.
+          try {
+            const stateRes = await window.storage.get(STORAGE_KEY, false);
+            if (stateRes && stateRes.value) {
+              const parsed = JSON.parse(stateRes.value);
+              setState((s) => ({ ...s, ...parsed }));
+            }
+          } catch (e) {
+            /* next reload will pick it up regardless */
+          }
+          setWalletSheet(null);
+        } else if (status === 'failed') {
+          showToast('✗ Payment failed');
+        } else if (status === 'cancelled') {
+          showToast('Payment cancelled');
+        }
+      });
+    } catch (e) {
+      showToast('✗ Could not start payment, try again');
+      setPayingPackage(null);
+    }
   }
 
   const GEM_RATE = 15; // 1 gem = 15 coins
@@ -703,7 +798,10 @@ export default function KebunKripto() {
             <div style={styles.brandMark}>🌱</div>
             <div>
               <div style={styles.brandText}>Crypto Farm</div>
-              <div style={styles.brandSub}>{screenLabels[screen]}</div>
+              <div style={styles.brandSub}>
+                {screenLabels[screen]}
+                {(state.dailyLogin?.streak || 0) > 1 && ` · 📅 Day ${state.dailyLogin.streak}`}
+              </div>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -803,7 +901,7 @@ export default function KebunKripto() {
         />
       )}
 
-      {walletSheet === 'topup' && <TopUpSheet onPick={topUp} onClose={() => setWalletSheet(null)} />}
+      {walletSheet === 'topup' && <TopUpSheet onPick={buyWithStars} payingPackage={payingPackage} onClose={() => setWalletSheet(null)} />}
       {walletSheet === 'exchange' && <ExchangeSheet gems={state.gems} rate={GEM_RATE} onPick={exchangeGems} onClose={() => setWalletSheet(null)} />}
 
       {toast && <div style={styles.toast}>{toast}</div>}
@@ -1205,6 +1303,25 @@ function LeaderboardScreen({ profile, onClaim, showToast }) {
     setTimeout(() => setCopied(false), 1500);
   }
 
+  function shareCode() {
+    if (!profile) return;
+    const botUsername = window.__BOT_USERNAME__;
+    if (!botUsername) {
+      copyCode();
+      showToast('Bot username not configured — code copied instead, share it manually.');
+      return;
+    }
+    const deepLink = `https://t.me/${botUsername}?startapp=${profile.playerId}`;
+    const text = `Come farm crypto with me on Crypto Farm 🌱 Use my link and we both get a bonus!`;
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(deepLink)}&text=${encodeURIComponent(text)}`;
+    const tg = window.Telegram?.WebApp;
+    if (tg?.openTelegramLink) {
+      tg.openTelegramLink(shareUrl);
+    } else {
+      window.open(shareUrl, '_blank');
+    }
+  }
+
   return (
     <>
       <div style={styles.sectionHead}>
@@ -1213,11 +1330,12 @@ function LeaderboardScreen({ profile, onClaim, showToast }) {
       <div style={{ padding: '0 18px 10px', position: 'relative', zIndex: 2 }}>
         <div style={styles.card}>
           <div style={{ fontSize: 11, color: '#8FA69C', marginBottom: 8 }}>Share this code with friends. When they claim it, you get +1 referral (shown on the board).</div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <div style={{ flex: 1, background: '#182B25', border: '1px solid #223530', borderRadius: 10, padding: '9px 12px', fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, color: '#4AFFB0', letterSpacing: '0.05em' }}>
-              {profile?.playerId || '...'}
-            </div>
-            <button onClick={copyCode} style={styles.btnGhostSm}>{copied ? '✓ Copied' : 'Copy'}</button>
+          <div style={{ background: '#182B25', border: '1px solid #223530', borderRadius: 10, padding: '9px 12px', fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, color: '#4AFFB0', letterSpacing: '0.05em', marginBottom: 8 }}>
+            {profile?.playerId || '...'}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={copyCode} style={{ ...styles.btnGhostSm, flex: 1 }}>{copied ? '✓ Copied' : 'Copy Code'}</button>
+            <button onClick={shareCode} style={{ ...styles.btnMint, flex: 1 }}>Share Link</button>
           </div>
           <div style={{ height: 1, background: '#223530', margin: '14px 0' }} />
           <div style={{ fontSize: 11, color: '#8FA69C', marginBottom: 8 }}>Got a code from a friend? Claim it here (+30 gems, one-time use per code):</div>
@@ -1506,12 +1624,12 @@ function PredictSheet({ crop, now, timeframe, leverage, onPickLeverage, insuranc
   );
 }
 
-function TopUpSheet({ onPick, onClose }) {
+function TopUpSheet({ onPick, payingPackage, onClose }) {
   const packages = [
-    { coins: 100, note: 'Small Pack' },
-    { coins: 300, note: 'Medium Pack', badge: 'Popular' },
-    { coins: 750, note: 'Large Pack' },
-    { coins: 2000, note: 'Jumbo Pack' },
+    { key: 'small', coins: 100, stars: 20, note: 'Small Pack' },
+    { key: 'medium', coins: 300, stars: 50, note: 'Medium Pack', badge: 'Popular' },
+    { key: 'large', coins: 750, stars: 100, note: 'Large Pack' },
+    { key: 'jumbo', coins: 2000, stars: 250, note: 'Jumbo Pack' },
   ];
   return (
     <div style={styles.sheetBackdrop} onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -1521,15 +1639,26 @@ function TopUpSheet({ onPick, onClose }) {
           <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 17 }}>Top Up Coins</div>
           <button onClick={onClose} style={styles.closeBtn}>✕</button>
         </div>
-        <div style={{ fontSize: 11.5, color: '#8FA69C', marginBottom: 16 }}>Simulated top-up — not connected to real payments yet.</div>
+        <div style={{ fontSize: 11.5, color: '#8FA69C', marginBottom: 16 }}>Paid with Telegram Stars ⭐ — Telegram's built-in payment method.</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          {packages.map((p) => (
-            <button key={p.coins} onClick={() => onPick(p.coins)} style={styles.topupCard}>
-              {p.badge && <div style={styles.topupBadge}>{p.badge}</div>}
-              <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 18, fontWeight: 600, color: '#E8C468' }}>◆ {p.coins.toLocaleString('en-US')}</div>
-              <div style={{ fontSize: 10.5, color: '#8FA69C', marginTop: 3 }}>{p.note}</div>
-            </button>
-          ))}
+          {packages.map((p) => {
+            const isPaying = payingPackage === p.key;
+            const disabled = payingPackage && !isPaying;
+            return (
+              <button
+                key={p.key}
+                onClick={() => !payingPackage && onPick(p.key)}
+                style={{ ...styles.topupCard, opacity: disabled ? 0.4 : 1, cursor: payingPackage ? 'default' : 'pointer' }}
+              >
+                {p.badge && <div style={styles.topupBadge}>{p.badge}</div>}
+                <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 18, fontWeight: 600, color: '#E8C468' }}>◆ {p.coins.toLocaleString('en-US')}</div>
+                <div style={{ fontSize: 10.5, color: '#8FA69C', marginTop: 3 }}>{p.note}</div>
+                <div style={{ fontSize: 12, color: '#4AFFB0', marginTop: 6, fontWeight: 600 }}>
+                  {isPaying ? 'Opening…' : `⭐ ${p.stars}`}
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>
