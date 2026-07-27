@@ -57,7 +57,7 @@ function getDisplayPrice(assetId, timeMs) {
   return base * (1 + idx * vol);
 }
 function fmtPrice(price) {
-  if (price >= 1000) return price.toLocaleString('id-ID', { maximumFractionDigits: 0 });
+  if (price >= 1000) return price.toLocaleString('en-US', { maximumFractionDigits: 0 });
   if (price >= 1) return price.toFixed(2);
   return price.toFixed(4);
 }
@@ -67,12 +67,12 @@ function fmtPrice(price) {
    cost of a seed is felt in time invested, not just currency spent.
    Fastest crop is floored at 1 minute so nothing feels instant. */
 const CROPS = {
-  gandum:   { id: 'gandum',   icon: '🌾', name: 'Gandum Cahaya', tier: 'ETH-tier', asset: 'eth', growSec: 60,  baseValue: 70,  seedCost: 40, seedCurrency: 'coins' },
-  jagung:   { id: 'jagung',   icon: '🌽', name: 'Jagung Neon',   tier: 'ADA-tier', asset: 'ada', growSec: 95,  baseValue: 95,  seedCost: 55, seedCurrency: 'coins' },
-  stroberi: { id: 'stroberi', icon: '🍓', name: 'Stroberi Kilat',tier: 'DOT-tier', asset: 'dot', growSec: 130, baseValue: 115, seedCost: 65, seedCurrency: 'coins' },
-  semangka: { id: 'semangka', icon: '🍉', name: 'Semangka Beku', tier: 'BTC-tier', asset: 'btc', growSec: 180, baseValue: 140, seedCost: 80, seedCurrency: 'coins' },
-  anggur:   { id: 'anggur',   icon: '🍇', name: 'Anggur Malam',  tier: 'SOL-tier', asset: 'sol', growSec: 310, baseValue: 210, seedCost: 120, seedCurrency: 'coins' },
-  nanas:    { id: 'nanas',    icon: '🍍', name: 'Nanas Prima',   tier: 'AVAX-tier',asset: 'avax', growSec: 580, baseValue: 220, seedCost: 6, seedCurrency: 'gems' },
+  gandum:   { id: 'gandum',   icon: '🌾', name: 'Glowing Wheat', tier: 'ETH-tier', asset: 'eth', growSec: 60,  baseValue: 70,  seedCost: 40, seedCurrency: 'coins' },
+  jagung:   { id: 'jagung',   icon: '🌽', name: 'Neon Corn',   tier: 'ADA-tier', asset: 'ada', growSec: 95,  baseValue: 95,  seedCost: 55, seedCurrency: 'coins' },
+  stroberi: { id: 'stroberi', icon: '🍓', name: 'Flash Strawberry',tier: 'DOT-tier', asset: 'dot', growSec: 130, baseValue: 115, seedCost: 65, seedCurrency: 'coins' },
+  semangka: { id: 'semangka', icon: '🍉', name: 'Frozen Watermelon', tier: 'BTC-tier', asset: 'btc', growSec: 180, baseValue: 140, seedCost: 80, seedCurrency: 'coins' },
+  anggur:   { id: 'anggur',   icon: '🍇', name: 'Night Grapes',  tier: 'SOL-tier', asset: 'sol', growSec: 310, baseValue: 210, seedCost: 120, seedCurrency: 'coins' },
+  nanas:    { id: 'nanas',    icon: '🍍', name: 'Prime Pineapple',   tier: 'AVAX-tier',asset: 'avax', growSec: 580, baseValue: 220, seedCost: 6, seedCurrency: 'gems' },
 };
 
 /* Seasonal crops: a rotating pool where only ONE is purchasable per real-world
@@ -82,11 +82,11 @@ const CROPS = {
    moves on — only the "available to buy" gate is time-limited. Econ is
    noticeably better than regular crops to justify the FOMO. */
 const SEASONAL_CROPS = {
-  melon_emas:    { id: 'melon_emas',    icon: '🍈', name: 'Melon Emas',     tier: 'BTC-tier', asset: 'btc', growSec: 240, baseValue: 260, seedCost: 100, seedCurrency: 'coins', seasonal: true },
-  kelapa_kilau:  { id: 'kelapa_kilau',  icon: '🥥', name: 'Kelapa Kilau',   tier: 'ETH-tier', asset: 'eth', growSec: 150, baseValue: 165, seedCost: 65,  seedCurrency: 'coins', seasonal: true },
-  markisa_petir: { id: 'markisa_petir', icon: '🫐', name: 'Markisa Petir', tier: 'SOL-tier', asset: 'sol', growSec: 200, baseValue: 195, seedCost: 75,  seedCurrency: 'coins', seasonal: true },
-  leci_neon:     { id: 'leci_neon',     icon: '🍒', name: 'Leci Neon',     tier: 'ADA-tier', asset: 'ada', growSec: 120, baseValue: 130, seedCost: 50,  seedCurrency: 'coins', seasonal: true },
-  kurma_prisma:  { id: 'kurma_prisma',  icon: '🌰', name: 'Kurma Prisma',  tier: 'DOT-tier', asset: 'dot', growSec: 170, baseValue: 175, seedCost: 68,  seedCurrency: 'coins', seasonal: true },
+  melon_emas:    { id: 'melon_emas',    icon: '🍈', name: 'Gold Melon',     tier: 'BTC-tier', asset: 'btc', growSec: 240, baseValue: 260, seedCost: 100, seedCurrency: 'coins', seasonal: true },
+  kelapa_kilau:  { id: 'kelapa_kilau',  icon: '🥥', name: 'Shimmer Coconut',   tier: 'ETH-tier', asset: 'eth', growSec: 150, baseValue: 165, seedCost: 65,  seedCurrency: 'coins', seasonal: true },
+  markisa_petir: { id: 'markisa_petir', icon: '🫐', name: 'Thunder Passionfruit', tier: 'SOL-tier', asset: 'sol', growSec: 200, baseValue: 195, seedCost: 75,  seedCurrency: 'coins', seasonal: true },
+  leci_neon:     { id: 'leci_neon',     icon: '🍒', name: 'Neon Lychee',     tier: 'ADA-tier', asset: 'ada', growSec: 120, baseValue: 130, seedCost: 50,  seedCurrency: 'coins', seasonal: true },
+  kurma_prisma:  { id: 'kurma_prisma',  icon: '🌰', name: 'Prism Date',  tier: 'DOT-tier', asset: 'dot', growSec: 170, baseValue: 175, seedCost: 68,  seedCurrency: 'coins', seasonal: true },
 };
 const SEASONAL_ROTATION = Object.keys(SEASONAL_CROPS);
 function dayOfYear(d) {
@@ -106,19 +106,19 @@ function getCrop(id) {
 
 
 const TIMEFRAMES = [
-  { key: '1m', label: '1 Menit', sec: 60, multiplier: 1.0 },
-  { key: '3m', label: '3 Menit', sec: 180, multiplier: 1.3 },
-  { key: '5m', label: '5 Menit', sec: 300, multiplier: 1.6 },
-  { key: '15m', label: '15 Menit', sec: 900, multiplier: 2.5 },
+  { key: '1m', label: '1 Minute', sec: 60, multiplier: 1.0 },
+  { key: '3m', label: '3 Minutes', sec: 180, multiplier: 1.3 },
+  { key: '5m', label: '5 Minutes', sec: 300, multiplier: 1.6 },
+  { key: '15m', label: '15 Minutes', sec: 900, multiplier: 2.5 },
 ];
 
 /* Leverage: stake extra coins upfront for a bigger reward multiplier, at the
    cost of a much harsher downside if the guess is wrong. 1x is the default,
    free option with no upfront stake (same behavior as before leverage existed). */
 const LEVERAGE_OPTIONS = [
-  { key: '1x', label: '1×', stakePct: 0, rewardMult: 1, lossMult: 0.1, desc: 'Normal, tanpa taruhan tambahan' },
-  { key: '2x', label: '2×', stakePct: 0.5, rewardMult: 2, lossMult: 0, desc: 'Taruhan 50% nilai dasar' },
-  { key: '3x', label: '3×', stakePct: 1.0, rewardMult: 3, lossMult: 0, desc: 'Taruhan 100% nilai dasar' },
+  { key: '1x', label: '1×', stakePct: 0, rewardMult: 1, lossMult: 0.1, desc: 'Normal, no extra stake' },
+  { key: '2x', label: '2×', stakePct: 0.5, rewardMult: 2, lossMult: 0, desc: 'Stake 50% of base value' },
+  { key: '3x', label: '3×', stakePct: 1.0, rewardMult: 3, lossMult: 0, desc: 'Stake 100% of base value' },
 ];
 
 /* Insurance: pay a small non-refundable premium upfront (charged regardless of
@@ -127,9 +127,9 @@ const LEVERAGE_OPTIONS = [
    picked — it only raises the loss-multiplier, capped so it never approaches
    the win payout. */
 const INSURANCE_OPTIONS = [
-  { key: 'none', label: 'Tanpa Asuransi', costPct: 0, lossBonus: 0, desc: 'Nggak ada perlindungan tambahan' },
-  { key: 'basic', label: 'Dasar', costPct: 0.15, lossBonus: 0.2, desc: 'Premi 15% · +20% jaminan balik kalau meleset' },
-  { key: 'premium', label: 'Premium', costPct: 0.3, lossBonus: 0.4, desc: 'Premi 30% · +40% jaminan balik kalau meleset' },
+  { key: 'none', label: 'No Insurance', costPct: 0, lossBonus: 0, desc: 'No extra protection' },
+  { key: 'basic', label: 'Basic', costPct: 0.15, lossBonus: 0.2, desc: 'Premium 15% · +20% guaranteed return if wrong' },
+  { key: 'premium', label: 'Premium', costPct: 0.3, lossBonus: 0.4, desc: 'Premium 30% · +40% guaranteed return if wrong' },
 ];
 
 const PLOT_COUNT = 9;
@@ -139,7 +139,7 @@ function genPlayerId() {
   return 'p' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
 }
 function genNickname(id) {
-  return 'Petani#' + id.slice(-4).toUpperCase();
+  return 'Farmer#' + id.slice(-4).toUpperCase();
 }
 
 function emptyPlots() {
@@ -161,15 +161,15 @@ function defaultState() {
 }
 
 const ACHIEVEMENTS = [
-  { id: 'first_guess', icon: '🌱', name: 'Panen Pertama', desc: 'Selesaikan 1 tebakan', reward: 2, check: (s) => s.totalPredictions >= 1 },
-  { id: 'correct_10', icon: '🎯', name: 'Penebak Jitu', desc: '10 tebakan benar', reward: 5, check: (s) => s.totalCorrect >= 10 },
-  { id: 'correct_50', icon: '🏹', name: 'Mata Elang', desc: '50 tebakan benar', reward: 15, check: (s) => s.totalCorrect >= 50 },
-  { id: 'streak_5', icon: '🔥', name: 'Lagi Panas', desc: 'Streak 5 tebakan benar beruntun', reward: 10, check: (s) => s.bestStreak >= 5 },
-  { id: 'streak_10', icon: '💥', name: 'Tak Terhentikan', desc: 'Streak 10 tebakan benar beruntun', reward: 25, check: (s) => s.bestStreak >= 10 },
-  { id: 'event_hunter', icon: '⚡', name: 'Pemburu Volatile', desc: 'Menang 5x saat event volatile aktif', reward: 15, check: (s) => s.eventWins >= 5 },
-  { id: 'earn_2000', icon: '💰', name: 'Mulai Kaya', desc: 'Total penghasilan 2.000 koin', reward: 20, check: (s) => s.totalCoinsEarned >= 2000 },
-  { id: 'earn_5000', icon: '👑', name: 'Sultan Kebun', desc: 'Total penghasilan 5.000 koin', reward: 30, check: (s) => s.totalCoinsEarned >= 5000 },
-  { id: 'consistent_100', icon: '📈', name: 'Konsisten', desc: 'Selesaikan 100 tebakan', reward: 40, check: (s) => s.totalPredictions >= 100 },
+  { id: 'first_guess', icon: '🌱', name: 'First Harvest', desc: 'Complete 1 prediction', reward: 2, check: (s) => s.totalPredictions >= 1 },
+  { id: 'correct_10', icon: '🎯', name: 'Sharp Shooter', desc: '10 correct predictions', reward: 5, check: (s) => s.totalCorrect >= 10 },
+  { id: 'correct_50', icon: '🏹', name: 'Eagle Eye', desc: '50 correct predictions', reward: 15, check: (s) => s.totalCorrect >= 50 },
+  { id: 'streak_5', icon: '🔥', name: 'On Fire', desc: '5 correct predictions in a row', reward: 10, check: (s) => s.bestStreak >= 5 },
+  { id: 'streak_10', icon: '💥', name: 'Unstoppable', desc: '10 correct predictions in a row', reward: 25, check: (s) => s.bestStreak >= 10 },
+  { id: 'event_hunter', icon: '⚡', name: 'Volatility Hunter', desc: 'Win 5x during an active volatile event', reward: 15, check: (s) => s.eventWins >= 5 },
+  { id: 'earn_2000', icon: '💰', name: 'Getting Rich', desc: 'Total earnings of 2,000 coins', reward: 20, check: (s) => s.totalCoinsEarned >= 2000 },
+  { id: 'earn_5000', icon: '👑', name: 'Farm Sultan', desc: 'Total earnings of 5,000 coins', reward: 30, check: (s) => s.totalCoinsEarned >= 5000 },
+  { id: 'consistent_100', icon: '📈', name: 'Consistent', desc: 'Complete 100 predictions', reward: 40, check: (s) => s.totalPredictions >= 100 },
 ];
 
 
@@ -255,10 +255,10 @@ function fmtCountdown(ms) {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 function fmtGrowDuration(sec) {
-  if (sec < 60) return `${sec}d`;
+  if (sec < 60) return `${sec}s`;
   const m = Math.floor(sec / 60);
   const s = sec % 60;
-  return s === 0 ? `${m}mnt` : `${m}mnt ${s}d`;
+  return s === 0 ? `${m}m` : `${m}m ${s}s`;
 }
 
 /* ---------------- Main App ---------------- */
@@ -381,11 +381,11 @@ export default function KebunKripto() {
     if (!code) return;
     if (!profile) return;
     if (code === profile.playerId) {
-      showToast('✗ Nggak bisa pakai kode sendiri');
+      showToast("✗ Can't use your own code");
       return;
     }
     if (claimedReferrals.includes(code)) {
-      showToast('✗ Kode ini udah pernah diklaim');
+      showToast('✗ This code was already claimed');
       return;
     }
     let referrerEntry = null;
@@ -396,13 +396,13 @@ export default function KebunKripto() {
       referrerEntry = null;
     }
     if (!referrerEntry) {
-      showToast('✗ Kode referral nggak ditemukan');
+      showToast('✗ Referral code not found');
       return;
     }
     setState((s) => ({
       ...s,
       gems: s.gems + 30,
-      tx: [{ icon: '🎁', title: `Klaim kode referral ${code}`, value: '+30', dir: 'in', time: 'Baru saja' }, ...s.tx].slice(0, 20),
+      tx: [{ icon: '🎁', title: `Claimed referral code ${code}`, value: '+30', dir: 'in', time: 'Just now' }, ...s.tx].slice(0, 20),
     }));
     const newClaimed = [...claimedReferrals, code];
     setClaimedReferrals(newClaimed);
@@ -415,7 +415,7 @@ export default function KebunKripto() {
     } catch (e) {
       /* best effort */
     }
-    showToast('✓ Kode berhasil diklaim! +30 gem buat kamu');
+    showToast('✓ Code claimed! +30 gems for you');
   }
 
   const showToast = useCallback((msg) => {
@@ -446,7 +446,7 @@ export default function KebunKripto() {
         const nextEvents = spawned ? [...activeEvents, spawned] : activeEvents;
         setState((prev) => ({ ...prev, marketEvents: nextEvents }));
         if (spawned) {
-          showToast(`🔥 ${ASSET_TIER_NAMES[spawned.asset]} lagi Volatile! Reward ×${spawned.multiplier.toFixed(1)} selama ${Math.round((spawned.endAt - spawned.startAt) / 1000)}d`);
+          showToast(`🔥 ${ASSET_TIER_NAMES[spawned.asset]} is Volatile! Reward ×${spawned.multiplier.toFixed(1)} for ${Math.round((spawned.endAt - spawned.startAt) / 1000)}s`);
         }
       }
 
@@ -495,11 +495,11 @@ export default function KebunKripto() {
             newTx.push({
               icon: correct ? '🎯' : crop.icon,
               title: correct
-                ? `Tebakan tepat · ${crop.name} (${p.timeframeLabel})${streakBonusPct > 0 ? ` · 🔥+${Math.round(streakBonusPct * 100)}%` : ''}${eventMult > 1 ? ` · ⚡×${eventMult.toFixed(1)}` : ''}${rewardMult > 1 ? ` · 🎲${p.leverageKey}` : ''}`
-                : `Tebakan meleset · ${crop.name} (${p.timeframeLabel})${rewardMult > 1 ? ` · 🎲${p.leverageKey} taruhan hangus` : ''}${p.insuranceKey && p.insuranceKey !== 'none' ? ` · 🛡️ asuransi ${p.insuranceKey}` : ''}`,
+                ? `Correct guess · ${crop.name} (${p.timeframeLabel})${streakBonusPct > 0 ? ` · 🔥+${Math.round(streakBonusPct * 100)}%` : ''}${eventMult > 1 ? ` · ⚡×${eventMult.toFixed(1)}` : ''}${rewardMult > 1 ? ` · 🎲${p.leverageKey}` : ''}`
+                : `Wrong guess · ${crop.name} (${p.timeframeLabel})${rewardMult > 1 ? ` · 🎲${p.leverageKey} stake forfeited` : ''}${p.insuranceKey && p.insuranceKey !== 'none' ? ` · 🛡️ ${p.insuranceKey} insurance` : ''}`,
               value: `+${reward}`,
               dir: 'in',
-              time: 'Baru saja',
+              time: 'Just now',
             });
             resultById.set(p.id, { correct, reward, actualUp });
           });
@@ -520,11 +520,11 @@ export default function KebunKripto() {
           const newLevel = getLevelInfo(xp).level;
           if (newlyUnlocked.length > 0) {
             const a = newlyUnlocked[0];
-            showToast(`🏆 Pencapaian: ${a.name}! +${a.reward} gem${newlyUnlocked.length > 1 ? ` (+${newlyUnlocked.length - 1} lainnya)` : ''}`);
+            showToast(`🏆 Achievement: ${a.name}! +${a.reward} gems${newlyUnlocked.length > 1 ? ` (+${newlyUnlocked.length - 1} more)` : ''}`);
           } else if (newLevel > prevLevel) {
-            showToast(`🎉 Naik ke Level ${newLevel}! Slot kebun baru terbuka`);
+            showToast(`🎉 Leveled up to ${newLevel}! New farm slot unlocked`);
           } else if (newTx.length > 0) {
-            const summary = due.length === 1 ? newTx[0].title : `${due.length} tebakan selesai diresolusi`;
+            const summary = due.length === 1 ? newTx[0].title : `${due.length} predictions resolved`;
             showToast(`✓ ${summary}`);
           }
           return {
@@ -556,16 +556,16 @@ export default function KebunKripto() {
     setState((s) => ({
       ...s,
       coins: s.coins + amount,
-      tx: [{ icon: '💳', title: `Top up ${amount.toLocaleString('id-ID')} koin`, value: `+${amount}`, dir: 'in', time: 'Baru saja' }, ...s.tx].slice(0, 20),
+      tx: [{ icon: '💳', title: `Top up ${amount.toLocaleString('en-US')} coins`, value: `+${amount}`, dir: 'in', time: 'Just now' }, ...s.tx].slice(0, 20),
     }));
     setWalletSheet(null);
-    showToast(`✓ ${amount.toLocaleString('id-ID')} koin ditambahkan`);
+    showToast(`✓ ${amount.toLocaleString('en-US')} coins added`);
   }
 
-  const GEM_RATE = 15; // 1 gem = 15 koin
+  const GEM_RATE = 15; // 1 gem = 15 coins
   function exchangeGems(gemAmount) {
     if (state.gems < gemAmount) {
-      showToast('✗ Gem tidak cukup');
+      showToast('✗ Not enough gems');
       return;
     }
     const coinsGained = gemAmount * GEM_RATE;
@@ -573,17 +573,17 @@ export default function KebunKripto() {
       ...s,
       gems: s.gems - gemAmount,
       coins: s.coins + coinsGained,
-      tx: [{ icon: '✦', title: `Tukar ${gemAmount} gem → koin`, value: `+${coinsGained}`, dir: 'in', time: 'Baru saja' }, ...s.tx].slice(0, 20),
+      tx: [{ icon: '✦', title: `Exchange ${gemAmount} gems → coins`, value: `+${coinsGained}`, dir: 'in', time: 'Just now' }, ...s.tx].slice(0, 20),
     }));
     setWalletSheet(null);
-    showToast(`✓ ${gemAmount} gem ditukar jadi ${coinsGained} koin`);
+    showToast(`✓ ${gemAmount} gems exchanged for ${coinsGained} coins`);
   }
 
   function buyDirect(cropId) {
     const unlockedCount = getLevelInfo(state.xp || 0).plots;
     const firstEmpty = state.plots.find((p) => !p.cropId && p.id < unlockedCount);
     if (!firstEmpty) {
-      showToast('✗ Semua petak terisi atau masih terkunci');
+      showToast('✗ All plots are full or still locked');
       return;
     }
     plantSeed(firstEmpty.id, cropId);
@@ -592,13 +592,13 @@ export default function KebunKripto() {
   function plantSeed(plotId, cropId) {
     const crop = getCrop(cropId);
     if (crop.seasonal && getTodaysSeasonalCrop().crop.id !== cropId) {
-      showToast('✗ Bibit musiman ini udah nggak tersedia hari ini');
+      showToast("✗ This seasonal seed isn't available today anymore");
       return;
     }
     const cost = crop.seedCost;
     const currency = crop.seedCurrency;
     if (state[currency] < cost) {
-      showToast(`✗ ${currency === 'coins' ? 'Koin' : 'Gem'} tidak cukup`);
+      showToast(`✗ Not enough ${currency === 'coins' ? 'coins' : 'gems'}`);
       return;
     }
     setState((s) => ({
@@ -607,7 +607,7 @@ export default function KebunKripto() {
       plots: s.plots.map((p) => (p.id === plotId ? { ...p, cropId, plantedAt: Date.now() } : p)),
     }));
     setSeedPickerPlot(null);
-    showToast(`✓ ${crop.name} ditanam`);
+    showToast(`✓ ${crop.name} planted`);
   }
 
   function lockPrediction(direction) {
@@ -623,7 +623,7 @@ export default function KebunKripto() {
     const insuranceCost = Math.round(crop.baseValue * insurance.costPct);
     const totalCost = stake + insuranceCost;
     if (totalCost > 0 && state.coins < totalCost) {
-      showToast(`✗ Koin tidak cukup (butuh ${totalCost} buat taruhan + asuransi)`);
+      showToast(`✗ Not enough coins (need ${totalCost} for stake + insurance)`);
       return;
     }
     const effectiveLossMult = Math.min(0.9, leverage.lossMult + insurance.lossBonus);
@@ -655,17 +655,17 @@ export default function KebunKripto() {
     setSheetTimeframe(null);
     setSheetLeverage(LEVERAGE_OPTIONS[0]);
     setSheetInsurance(INSURANCE_OPTIONS[0]);
-    const costNote = totalCost > 0 ? ` · dipotong ${totalCost} koin` : '';
-    showToast(activeEvent ? `🔒 Dikunci · ${sheetTimeframe.label} · 🔥 bonus event ×${eventMultiplier.toFixed(1)}${costNote}` : `🔒 Tebakan dikunci · ${sheetTimeframe.label}${costNote}`);
+    const costNote = totalCost > 0 ? ` · ${totalCost} coins deducted` : '';
+    showToast(activeEvent ? `🔒 Locked · ${sheetTimeframe.label} · 🔥 event bonus ×${eventMultiplier.toFixed(1)}${costNote}` : `🔒 Prediction locked · ${sheetTimeframe.label}${costNote}`);
   }
 
-  const screenLabels = { kebun: 'Musim Panen 04', pasar: 'Pantauan Pasar', gudang: 'Penyimpanan Hasil', dompet: 'Ringkasan Saldo', papan: 'Papan Peringkat' };
+  const screenLabels = { kebun: 'Harvest Season 04', pasar: 'Market Watch', gudang: 'Storage', dompet: 'Balance Summary', papan: 'Leaderboard' };
 
   if (!loaded) {
     return (
       <div style={styles.body}>
         <div style={{ ...styles.device, alignItems: 'center', justifyContent: 'center', color: '#8FA69C', fontFamily: 'Inter, sans-serif' }}>
-          Memuat kebun…
+          Loading farm…
         </div>
       </div>
     );
@@ -702,14 +702,14 @@ export default function KebunKripto() {
           <div style={styles.brand}>
             <div style={styles.brandMark}>🌱</div>
             <div>
-              <div style={styles.brandText}>Kebun Kripto</div>
+              <div style={styles.brandText}>Crypto Farm</div>
               <div style={styles.brandSub}>{screenLabels[screen]}</div>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <div style={{ ...styles.pill, color: '#E8C468' }}>
               <span style={{ ...styles.dot, background: 'rgba(232,196,104,0.15)' }}>◆</span>
-              {animatedCoins.toLocaleString('id-ID')}
+              {animatedCoins.toLocaleString('en-US')}
             </div>
             <div style={{ ...styles.pill, color: '#4AFFB0' }}>
               <span style={{ ...styles.dot, background: 'rgba(74,255,176,0.15)' }}>✦</span>
@@ -743,11 +743,11 @@ export default function KebunKripto() {
 
         <div style={styles.bottomNav}>
           {[
-            ['kebun', '🌿', 'Kebun'],
-            ['pasar', '📊', 'Pasar'],
-            ['gudang', '🎒', 'Gudang'],
-            ['dompet', '👛', 'Dompet'],
-            ['papan', '🏆', 'Papan'],
+            ['kebun', '🌿', 'Farm'],
+            ['pasar', '📊', 'Market'],
+            ['gudang', '🎒', 'Storage'],
+            ['dompet', '👛', 'Wallet'],
+            ['papan', '🏆', 'Board'],
           ].map(([key, icon, label]) => (
             <button key={key} onClick={() => setScreen(key)} style={{ ...styles.navItem, padding: '4px 8px', color: screen === key ? '#4AFFB0' : '#5C7268' }}>
               {screen === key && <div style={styles.navIndicator} />}
@@ -767,7 +767,7 @@ export default function KebunKripto() {
               const unlockedCount = getLevelInfo(state.xp || 0).plots;
               const firstEmpty = state.plots.find((p) => !p.cropId && p.id < unlockedCount);
               if (!firstEmpty) {
-                showToast('✗ Semua petak terisi atau masih terkunci');
+                showToast('✗ All plots are full or still locked');
                 setSeedPickerPlot(null);
                 return;
               }
@@ -875,7 +875,7 @@ function LevelBar({ levelInfo }) {
       <div style={{ flex: 1 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
           <span style={{ fontSize: 11, fontWeight: 600, color: '#8FA69C' }}>
-            {isMaxPlots ? 'Semua slot kebun terbuka' : `Slot berikutnya di Level ${level + 1}`}
+            {isMaxPlots ? 'All farm slots unlocked' : `Next slot at Level ${level + 1}`}
           </span>
           <span style={{ fontSize: 10, fontFamily: "'IBM Plex Mono', monospace", color: '#5C7268' }}>
             {xpIntoLevel}/{xpForNext} XP
@@ -898,17 +898,17 @@ function FarmScreen({ plots, predictions, now, streak, unlockedPlots, plotProgre
         <div style={styles.streakBar}>
           <div style={{ fontSize: 18 }}>🔥</div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 700 }}>Streak {streak} tebakan benar</div>
+            <div style={{ fontSize: 12.5, fontWeight: 700 }}>{streak}-guess winning streak</div>
             <div style={{ fontSize: 10, color: '#8FA69C', marginTop: 1 }}>
-              Bonus reward saat ini: <span style={{ color: '#4AFFB0', fontFamily: "'IBM Plex Mono', monospace" }}>+{Math.round(streakBonusPct * 100)}%</span>
-              {streak <= STREAK_BONUS_CAP ? ' · sekali meleset, reset ke 0' : ' · sudah maksimal'}
+              Current reward bonus: <span style={{ color: '#4AFFB0', fontFamily: "'IBM Plex Mono', monospace" }}>+{Math.round(streakBonusPct * 100)}%</span>
+              {streak <= STREAK_BONUS_CAP ? ' · one miss resets it to 0' : ' · already maxed out'}
             </div>
           </div>
         </div>
       )}
       <div style={styles.sectionHead}>
-        <div style={styles.sectionTitle}>Kebunmu</div>
-        <div style={styles.sectionMeta}>{filled} / {unlockedPlots} petak</div>
+        <div style={styles.sectionTitle}>Your Farm</div>
+        <div style={styles.sectionMeta}>{filled} / {unlockedPlots} plots</div>
       </div>
       <div style={styles.farmGrid}>
         {plots.map((plot) => {
@@ -918,7 +918,7 @@ function FarmScreen({ plots, predictions, now, streak, unlockedPlots, plotProgre
             return (
               <div key={plot.id} style={{ ...styles.plot, borderStyle: 'dashed', opacity: 0.45 }}>
                 <div style={{ fontSize: 20 }}>🔒</div>
-                <div style={{ fontSize: 9, color: '#5C7268', marginTop: 4, textAlign: 'center' }}>Butuh Level {levelNeeded}</div>
+                <div style={{ fontSize: 9, color: '#5C7268', marginTop: 4, textAlign: 'center' }}>Requires Level {levelNeeded}</div>
               </div>
             );
           }
@@ -927,7 +927,7 @@ function FarmScreen({ plots, predictions, now, streak, unlockedPlots, plotProgre
             return (
               <div key={plot.id} style={{ ...styles.plot, borderStyle: 'dashed' }} onClick={() => onEmptyClick(plot.id)}>
                 <div className="kk-empty-plus" style={{ fontSize: 22, color: '#5C7268', fontWeight: 300 }}>+</div>
-                <div style={{ fontSize: 9.5, color: '#5C7268', marginTop: 4 }}>Tanam</div>
+                <div style={{ fontSize: 9.5, color: '#5C7268', marginTop: 4 }}>Plant</div>
               </div>
             );
           }
@@ -955,20 +955,20 @@ function FarmScreen({ plots, predictions, now, streak, unlockedPlots, plotProgre
                 {prog.crop.icon}
               </div>
               <div style={{ fontSize: 10, fontWeight: 600, marginTop: 6, position: 'relative', zIndex: 2, color: '#8FA69C' }}>{prog.crop.name}</div>
-              {prog.ready ? <div className="kk-ready-badge" style={styles.readyBadge}>Panen</div> : <div style={styles.plotTimer}>{prog.pct}%</div>}
+              {prog.ready ? <div className="kk-ready-badge" style={styles.readyBadge}>Harvest</div> : <div style={styles.plotTimer}>{prog.pct}%</div>}
             </div>
           );
         })}
       </div>
 
       <div style={styles.sectionHead}>
-        <div style={styles.sectionTitle}>Prediksi Berjalan</div>
-        <div style={styles.sectionMeta}>{predictions.length} terkunci</div>
+        <div style={styles.sectionTitle}>Active Predictions</div>
+        <div style={styles.sectionMeta}>{predictions.length} locked</div>
       </div>
       <div style={{ padding: '0 18px 24px', position: 'relative', zIndex: 2 }}>
         {predictions.length === 0 ? (
           <div style={{ ...styles.card, textAlign: 'center', color: '#5C7268', fontSize: 12.5, padding: '20px 16px' }}>
-            Belum ada tebakan terkunci. Panen tanaman lalu pilih timeframe untuk mengunci prediksi.
+            No locked predictions yet. Harvest a plant, then pick a timeframe to lock in a prediction.
           </div>
         ) : (
           <div style={styles.card}>
@@ -982,7 +982,7 @@ function FarmScreen({ plots, predictions, now, streak, unlockedPlots, plotProgre
                     <div>
                       <div style={styles.rowTitle}>{crop.name}</div>
                       <div style={styles.rowSub}>
-                        {p.direction === 'up' ? '↑ Naik' : '↓ Turun'} · {p.timeframeLabel}
+                        {p.direction === 'up' ? '↑ Up' : '↓ Down'} · {p.timeframeLabel}
                       </div>
                     </div>
                   </div>
@@ -1011,8 +1011,8 @@ function MarketScreen({ now, onBuy, onBuyDirect }) {
   return (
     <>
       <div style={styles.sectionHead}>
-        <div style={styles.sectionTitle}>🌟 Bibit Musiman</div>
-        <div style={styles.sectionMeta}>habis {fmtCountdown(endOfDay - now)}</div>
+        <div style={styles.sectionTitle}>🌟 Seasonal Seed</div>
+        <div style={styles.sectionMeta}>ends in {fmtCountdown(endOfDay - now)}</div>
       </div>
       <div style={{ padding: '0 18px 10px', position: 'relative', zIndex: 2 }}>
         <div style={styles.seasonalCard}>
@@ -1020,16 +1020,16 @@ function MarketScreen({ now, onBuy, onBuyDirect }) {
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 14 }}>{seasonalCrop.name}</div>
             <div style={{ fontSize: 10.5, color: '#E8C468', marginTop: 2 }}>
-              {seasonalCrop.tier} · benar {seasonalCrop.baseValue} koin (basis 1m) · {fmtGrowDuration(seasonalCrop.growSec)} tumbuh
+              {seasonalCrop.tier} · correct {seasonalCrop.baseValue} coins (1m base) · {fmtGrowDuration(seasonalCrop.growSec)} grow
             </div>
-            <div style={{ fontSize: 9.5, color: '#8FA69C', marginTop: 2 }}>Cuma tersedia hari ini — besok ganti bibit lain</div>
+            <div style={{ fontSize: 9.5, color: '#8FA69C', marginTop: 2 }}>Only available today — a different seed rotates in tomorrow</div>
           </div>
-          <button style={styles.btnMint} onClick={() => onBuyDirect(seasonalCrop.id)}>{seasonalCrop.seedCost} koin</button>
+          <button style={styles.btnMint} onClick={() => onBuyDirect(seasonalCrop.id)}>{seasonalCrop.seedCost} coins</button>
         </div>
       </div>
 
       <div style={styles.sectionHead}>
-        <div style={styles.sectionTitle}>Pasar Hari Ini</div>
+        <div style={styles.sectionTitle}>Today's Market</div>
         <div style={styles.sectionMeta}>live</div>
       </div>
       <div style={{ padding: '0 18px 10px', position: 'relative', zIndex: 2 }}>
@@ -1077,8 +1077,8 @@ function MarketScreen({ now, onBuy, onBuyDirect }) {
         </div>
       </div>
       <div style={styles.sectionHead}>
-        <div style={styles.sectionTitle}>Bibit Tersedia</div>
-        <div style={styles.sectionMeta}>{cropList.length} varian</div>
+        <div style={styles.sectionTitle}>Available Seeds</div>
+        <div style={styles.sectionMeta}>{cropList.length} varieties</div>
       </div>
       <div style={{ padding: '0 18px 24px', position: 'relative', zIndex: 2 }}>
         <div style={styles.card}>
@@ -1086,10 +1086,10 @@ function MarketScreen({ now, onBuy, onBuyDirect }) {
             <div key={c.id} style={{ ...styles.listRow, borderTop: i > 0 ? '1px solid #223530' : 'none' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={styles.rowIcon}>{c.icon}</div>
-                <div style={styles.rowTitle}>Bibit {c.name}</div>
+                <div style={styles.rowTitle}>{c.name} Seed</div>
               </div>
               <button style={styles.btnGhost} onClick={() => onBuy(c.id)}>
-                {c.seedCost} {c.seedCurrency === 'coins' ? 'koin' : 'gem'}
+                {c.seedCost} {c.seedCurrency === 'coins' ? 'coins' : 'gems'}
               </button>
             </div>
           ))}
@@ -1106,7 +1106,7 @@ function WarehouseScreen({ tx, unlockedAchievements }) {
   return (
     <>
       <div style={styles.sectionHead}>
-        <div style={styles.sectionTitle}>Pencapaian</div>
+        <div style={styles.sectionTitle}>Achievements</div>
         <div style={styles.sectionMeta}>{unlockedCount} / {ACHIEVEMENTS.length}</div>
       </div>
       <div style={{ padding: '0 18px 10px', position: 'relative', zIndex: 2 }}>
@@ -1132,13 +1132,13 @@ function WarehouseScreen({ tx, unlockedAchievements }) {
       </div>
 
       <div style={styles.sectionHead}>
-        <div style={styles.sectionTitle}>Riwayat Panen</div>
-        <div style={styles.sectionMeta}>{harvestTx.length} riwayat</div>
+        <div style={styles.sectionTitle}>Harvest History</div>
+        <div style={styles.sectionMeta}>{harvestTx.length} entries</div>
       </div>
       <div style={{ padding: '0 18px 24px', position: 'relative', zIndex: 2 }}>
         {harvestTx.length === 0 ? (
           <div style={{ ...styles.card, textAlign: 'center', color: '#5C7268', fontSize: 12.5, padding: '28px 16px' }}>
-            Belum ada hasil. Kunci dan menangkan prediksi untuk mengisi gudang.
+            No results yet. Lock in and win predictions to fill your storage.
           </div>
         ) : (
           <div style={styles.card}>
@@ -1208,45 +1208,45 @@ function LeaderboardScreen({ profile, onClaim, showToast }) {
   return (
     <>
       <div style={styles.sectionHead}>
-        <div style={styles.sectionTitle}>Kode Referral</div>
+        <div style={styles.sectionTitle}>Referral Code</div>
       </div>
       <div style={{ padding: '0 18px 10px', position: 'relative', zIndex: 2 }}>
         <div style={styles.card}>
-          <div style={{ fontSize: 11, color: '#8FA69C', marginBottom: 8 }}>Bagikan kode ini ke teman. Kalau mereka klaim, kamu dapat +1 referral (tercatat di papan).</div>
+          <div style={{ fontSize: 11, color: '#8FA69C', marginBottom: 8 }}>Share this code with friends. When they claim it, you get +1 referral (shown on the board).</div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <div style={{ flex: 1, background: '#182B25', border: '1px solid #223530', borderRadius: 10, padding: '9px 12px', fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, color: '#4AFFB0', letterSpacing: '0.05em' }}>
               {profile?.playerId || '...'}
             </div>
-            <button onClick={copyCode} style={styles.btnGhostSm}>{copied ? '✓ Disalin' : 'Salin'}</button>
+            <button onClick={copyCode} style={styles.btnGhostSm}>{copied ? '✓ Copied' : 'Copy'}</button>
           </div>
           <div style={{ height: 1, background: '#223530', margin: '14px 0' }} />
-          <div style={{ fontSize: 11, color: '#8FA69C', marginBottom: 8 }}>Punya kode dari teman? Klaim di sini (+30 gem, sekali pakai per kode):</div>
+          <div style={{ fontSize: 11, color: '#8FA69C', marginBottom: 8 }}>Got a code from a friend? Claim it here (+30 gems, one-time use per code):</div>
           <div style={{ display: 'flex', gap: 8 }}>
             <input
               value={codeInput}
               onChange={(e) => setCodeInput(e.target.value)}
-              placeholder="Masukkan kode teman"
+              placeholder="Enter a friend's code"
               style={styles.codeInput}
             />
             <button
               onClick={() => { onClaim(codeInput); setCodeInput(''); }}
               style={styles.btnMint}
             >
-              Klaim
+              Claim
             </button>
           </div>
         </div>
       </div>
 
       <div style={styles.sectionHead}>
-        <div style={styles.sectionTitle}>Papan Peringkat</div>
+        <div style={styles.sectionTitle}>Leaderboard</div>
         <div style={{ ...styles.sectionMeta, cursor: 'pointer' }} onClick={() => setRefreshKey((k) => k + 1)}>↻ Refresh</div>
       </div>
       <div style={{ padding: '0 18px 24px', position: 'relative', zIndex: 2 }}>
         {rows === null ? (
-          <div style={{ ...styles.card, textAlign: 'center', color: '#5C7268', fontSize: 12.5, padding: '24px 16px' }}>Memuat papan peringkat…</div>
+          <div style={{ ...styles.card, textAlign: 'center', color: '#5C7268', fontSize: 12.5, padding: '24px 16px' }}>Loading leaderboard…</div>
         ) : rows.length === 0 ? (
-          <div style={{ ...styles.card, textAlign: 'center', color: '#5C7268', fontSize: 12.5, padding: '24px 16px' }}>Belum ada pemain lain tercatat. Jadilah yang pertama!</div>
+          <div style={{ ...styles.card, textAlign: 'center', color: '#5C7268', fontSize: 12.5, padding: '24px 16px' }}>No other players yet. Be the first!</div>
         ) : (
           <div style={styles.card}>
             {rows.slice(0, 15).map((r, i) => {
@@ -1258,17 +1258,17 @@ function LeaderboardScreen({ profile, onClaim, showToast }) {
                       {i + 1}
                     </div>
                     <div>
-                      <div style={{ ...styles.rowTitle, color: isMe ? '#4AFFB0' : '#EAF3EE' }}>{r.nickname}{isMe ? ' (Kamu)' : ''}</div>
-                      <div style={styles.rowSub}>Lv{r.level} · {r.referrals || 0} referral</div>
+                      <div style={{ ...styles.rowTitle, color: isMe ? '#4AFFB0' : '#EAF3EE' }}>{r.nickname}{isMe ? ' (You)' : ''}</div>
+                      <div style={styles.rowSub}>Lv{r.level} · {r.referrals || 0} referrals</div>
                     </div>
                   </div>
-                  <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, color: '#E8C468' }}>◆ {r.coins.toLocaleString('id-ID')}</div>
+                  <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, color: '#E8C468' }}>◆ {r.coins.toLocaleString('en-US')}</div>
                 </div>
               );
             })}
           </div>
         )}
-        {myRank > 15 && <div style={{ fontSize: 10.5, color: '#5C7268', textAlign: 'center', marginTop: 10 }}>Peringkat kamu saat ini: #{myRank}</div>}
+        {myRank > 15 && <div style={{ fontSize: 10.5, color: '#5C7268', textAlign: 'center', marginTop: 10 }}>Your current rank: #{myRank}</div>}
       </div>
     </>
   );
@@ -1278,24 +1278,24 @@ function WalletScreen({ coins, gems, tx, onTopUp, onExchange }) {
   return (
     <>
       <div style={styles.balanceHero}>
-        <div style={{ fontSize: 11, color: '#8FA69C', letterSpacing: '0.03em', position: 'relative', zIndex: 2 }}>Total Saldo</div>
+        <div style={{ fontSize: 11, color: '#8FA69C', letterSpacing: '0.03em', position: 'relative', zIndex: 2 }}>Total Balance</div>
         <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 34, marginTop: 6, position: 'relative', zIndex: 2 }}>
-          {coins.toLocaleString('id-ID')} <span style={{ fontSize: 16, color: '#8FA69C', fontWeight: 500 }}>koin</span>
+          {coins.toLocaleString('en-US')} <span style={{ fontSize: 16, color: '#8FA69C', fontWeight: 500 }}>coins</span>
         </div>
-        <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11.5, color: '#4AFFB0', marginTop: 4, position: 'relative', zIndex: 2 }}>{gems} gem tersedia</div>
+        <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11.5, color: '#4AFFB0', marginTop: 4, position: 'relative', zIndex: 2 }}>{gems} gems available</div>
         <div style={{ display: 'flex', gap: 10, marginTop: 18, position: 'relative', zIndex: 2 }}>
           <button style={{ ...styles.btnMint, flex: 1 }} onClick={onTopUp}>Top Up</button>
-          <button style={{ ...styles.btnGhost, flex: 1 }} onClick={onExchange}>Tukar Gem</button>
+          <button style={{ ...styles.btnGhost, flex: 1 }} onClick={onExchange}>Exchange Gems</button>
         </div>
       </div>
       <div style={styles.sectionHead}>
-        <div style={styles.sectionTitle}>Riwayat</div>
-        <div style={styles.sectionMeta}>{tx.length} transaksi</div>
+        <div style={styles.sectionTitle}>History</div>
+        <div style={styles.sectionMeta}>{tx.length} transactions</div>
       </div>
       <div style={{ padding: '0 18px 24px', position: 'relative', zIndex: 2 }}>
         {tx.length === 0 ? (
           <div style={{ ...styles.card, textAlign: 'center', color: '#5C7268', fontSize: 12.5, padding: '28px 16px' }}>
-            Belum ada transaksi.
+            No transactions yet.
           </div>
         ) : (
           <div style={styles.card}>
@@ -1326,11 +1326,11 @@ function SeedPickerSheet({ coins, gems, onPick, onClose }) {
         <div style={{ padding: '0 20px' }}>
           <div style={styles.sheetHandle} />
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 16 }}>Pilih Bibit</div>
+            <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 16 }}>Choose a Seed</div>
             <button onClick={onClose} style={styles.closeBtn}>✕</button>
           </div>
           <div style={{ fontSize: 9.5, color: '#5C7268', marginBottom: 10, lineHeight: 1.4 }}>
-            Angka di tiap bibit = reward benar / meleset untuk tiap timeframe. Makin panjang timeframe, makin besar reward-nya.
+            The numbers on each seed show the correct/wrong reward per timeframe. Longer timeframe = bigger reward.
           </div>
         </div>
         <div style={{ overflowY: 'auto', padding: '0 20px 12px' }}>
@@ -1344,17 +1344,17 @@ function SeedPickerSheet({ coins, gems, onPick, onClose }) {
                     <div style={styles.rowIconSm}>{c.icon}</div>
                     <div>
                       <div style={{ fontSize: 12.5, fontWeight: 600 }}>{c.name}</div>
-                      <div style={{ fontSize: 9.5, color: '#5C7268', fontFamily: "'IBM Plex Mono', monospace", marginTop: 1 }}>{fmtGrowDuration(c.growSec)} tumbuh</div>
+                      <div style={{ fontSize: 9.5, color: '#5C7268', fontFamily: "'IBM Plex Mono', monospace", marginTop: 1 }}>{fmtGrowDuration(c.growSec)} grow</div>
                     </div>
                   </div>
                   <button style={{ ...styles.btnGhostSm, opacity: affordable ? 1 : 0.5, cursor: affordable ? 'pointer' : 'not-allowed' }} onClick={() => affordable && onPick(c.id)} disabled={!affordable}>
-                    {c.seedCost} {c.seedCurrency === 'coins' ? 'koin' : 'gem'}
+                    {c.seedCost} {c.seedCurrency === 'coins' ? 'coins' : 'gems'}
                   </button>
                 </div>
                 <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
                   {TIMEFRAMES.map((tf) => (
                     <div key={tf.key} style={{ flex: 1, textAlign: 'center', background: '#182B25', borderRadius: 8, padding: '4px 2px' }}>
-                      <div style={{ fontSize: 8, color: '#5C7268', fontFamily: "'IBM Plex Mono', monospace" }}>{tf.label.replace(' Menit', 'm')}</div>
+                      <div style={{ fontSize: 8, color: '#5C7268', fontFamily: "'IBM Plex Mono', monospace" }}>{tf.label.replace(/ Minutes?/, 'm')}</div>
                       <div style={{ fontSize: 10, color: '#4AFFB0', fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600 }}>{Math.round(c.baseValue * tf.multiplier)}</div>
                       <div style={{ fontSize: 8, color: '#E8C468', fontFamily: "'IBM Plex Mono', monospace" }}>/{Math.round(c.baseValue * tf.multiplier * 0.1)}</div>
                     </div>
@@ -1388,7 +1388,7 @@ function PredictSheet({ crop, now, timeframe, leverage, onPickLeverage, insuranc
             <div style={{ width: 46, height: 46, borderRadius: 12, background: '#182B25', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>{crop.icon}</div>
             <div>
               <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 17 }}>{crop.name}</div>
-              <div style={{ fontSize: 11.5, color: '#8FA69C', marginTop: 1 }}>{crop.tier} · reward dasar {crop.baseValue} koin</div>
+              <div style={{ fontSize: 11.5, color: '#8FA69C', marginTop: 1 }}>{crop.tier} · base reward {crop.baseValue} coins</div>
             </div>
           </div>
           <button onClick={onClose} style={styles.closeBtn}>✕</button>
@@ -1396,7 +1396,7 @@ function PredictSheet({ crop, now, timeframe, leverage, onPickLeverage, insuranc
 
         {activeEvent && (
           <div style={styles.eventBadge}>
-            ⚡ Lagi Volatile — reward ×{eventMult.toFixed(1)} kalau dikunci sekarang ({fmtCountdown(activeEvent.endAt - now)} lagi)
+            ⚡ Volatile right now — reward ×{eventMult.toFixed(1)} if locked in now ({fmtCountdown(activeEvent.endAt - now)} left)
           </div>
         )}
 
@@ -1404,7 +1404,7 @@ function PredictSheet({ crop, now, timeframe, leverage, onPickLeverage, insuranc
           <Sparkline assetId={crop.asset} now={now} windowSec={120} opacity={0.9} strokeWidth={2} />
         </div>
 
-        <div style={{ fontSize: 12, color: '#5C7268', margin: '10px 0 14px' }}>1. Pilih timeframe candle yang jadi dasar tebakan:</div>
+        <div style={{ fontSize: 12, color: '#5C7268', margin: '10px 0 14px' }}>1. Pick the candle timeframe your guess is based on:</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 7, marginBottom: timeframe ? 16 : 4 }}>
           {TIMEFRAMES.map((tf) => (
             <div
@@ -1424,7 +1424,7 @@ function PredictSheet({ crop, now, timeframe, leverage, onPickLeverage, insuranc
 
         {timeframe && (
           <>
-            <div style={{ fontSize: 12, color: '#5C7268', margin: '10px 0' }}>2. Pilih leverage (opsional, taruhan lebih besar = reward lebih besar):</div>
+            <div style={{ fontSize: 12, color: '#5C7268', margin: '10px 0' }}>2. Pick leverage (optional — bigger stake = bigger reward):</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 7, marginBottom: 16 }}>
               {LEVERAGE_OPTIONS.map((lv) => {
                 const lvStake = Math.round(crop.baseValue * lv.stakePct);
@@ -1442,13 +1442,13 @@ function PredictSheet({ crop, now, timeframe, leverage, onPickLeverage, insuranc
                     }}
                   >
                     <div>{lv.label}</div>
-                    <div style={{ fontSize: 8.5, opacity: 0.75, marginTop: 2 }}>{lvStake > 0 ? `stake ${lvStake}` : 'gratis'}</div>
+                    <div style={{ fontSize: 8.5, opacity: 0.75, marginTop: 2 }}>{lvStake > 0 ? `stake ${lvStake}` : 'free'}</div>
                   </div>
                 );
               })}
             </div>
 
-            <div style={{ fontSize: 12, color: '#5C7268', margin: '10px 0' }}>3. Asuransi (opsional, kurangin sakit kalau meleset):</div>
+            <div style={{ fontSize: 12, color: '#5C7268', margin: '10px 0' }}>3. Insurance (optional — softens a wrong guess):</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 7, marginBottom: 16 }}>
               {INSURANCE_OPTIONS.map((iv) => {
                 const ivCost = Math.round(crop.baseValue * iv.costPct);
@@ -1466,37 +1466,37 @@ function PredictSheet({ crop, now, timeframe, leverage, onPickLeverage, insuranc
                     }}
                   >
                     <div style={{ fontSize: 10.5 }}>{iv.label}</div>
-                    <div style={{ fontSize: 8.5, opacity: 0.75, marginTop: 2 }}>{ivCost > 0 ? `premi ${ivCost}` : 'gratis'}</div>
+                    <div style={{ fontSize: 8.5, opacity: 0.75, marginTop: 2 }}>{ivCost > 0 ? `premium ${ivCost}` : 'free'}</div>
                   </div>
                 );
               })}
             </div>
 
             <div style={{ fontSize: 12, color: '#5C7268', marginBottom: 10 }}>
-              4. Tebak arah harga saat candle {timeframe.label} ini ditutup:
+              4. Guess the price direction when this {timeframe.label} candle closes:
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button style={{ ...styles.predictBtn, opacity: canAffordStake ? 1 : 0.5 }} onClick={() => canAffordStake && onLock('up')}>
                 <span style={{ fontSize: 19, color: '#4AFFB0' }}>↑</span>
-                Naik
+                Up
               </button>
               <button style={{ ...styles.predictBtn, opacity: canAffordStake ? 1 : 0.5 }} onClick={() => canAffordStake && onLock('down')}>
                 <span style={{ fontSize: 19, color: '#FF6B5C' }}>↓</span>
-                Turun
+                Down
               </button>
             </div>
             <div style={{ textAlign: 'center', fontSize: 10.5, color: '#5C7268', marginTop: 14 }}>
-              Terkunci {timeframe.label} · benar ={' '}
-              <span style={{ color: '#4AFFB0', fontFamily: "'IBM Plex Mono', monospace" }}>{Math.round(crop.baseValue * timeframe.multiplier * eventMult * (1 + nextStreakBonusPct) * lev.rewardMult)} koin</span>
-              {' '}· meleset ={' '}
-              <span style={{ color: '#E8C468', fontFamily: "'IBM Plex Mono', monospace" }}>{Math.round(crop.baseValue * timeframe.multiplier * eventMult * effectiveLossMult)} koin</span>
+              Locked {timeframe.label} · correct ={' '}
+              <span style={{ color: '#4AFFB0', fontFamily: "'IBM Plex Mono', monospace" }}>{Math.round(crop.baseValue * timeframe.multiplier * eventMult * (1 + nextStreakBonusPct) * lev.rewardMult)} coins</span>
+              {' '}· wrong ={' '}
+              <span style={{ color: '#E8C468', fontFamily: "'IBM Plex Mono', monospace" }}>{Math.round(crop.baseValue * timeframe.multiplier * eventMult * effectiveLossMult)} coins</span>
               {totalCost > 0 && (
                 <div style={{ marginTop: 4, color: '#FF6B5C' }}>
-                  🎲 {totalCost} koin dipotong di muka ({stake > 0 ? `taruhan ${stake}` : ''}{stake > 0 && insuranceCost > 0 ? ' + ' : ''}{insuranceCost > 0 ? `premi ${insuranceCost}` : ''}){!canAffordStake ? ' — koin tidak cukup' : ''}
+                  🎲 {totalCost} coins deducted upfront ({stake > 0 ? `stake ${stake}` : ''}{stake > 0 && insuranceCost > 0 ? ' + ' : ''}{insuranceCost > 0 ? `premium ${insuranceCost}` : ''}){!canAffordStake ? ' — not enough coins' : ''}
                 </div>
               )}
               {streak > 0 && (
-                <div style={{ marginTop: 4, color: '#E8C468' }}>🔥 Sudah include bonus streak +{Math.round(nextStreakBonusPct * 100)}%</div>
+                <div style={{ marginTop: 4, color: '#E8C468' }}>🔥 Already includes streak bonus +{Math.round(nextStreakBonusPct * 100)}%</div>
               )}
             </div>
           </>
@@ -1508,25 +1508,25 @@ function PredictSheet({ crop, now, timeframe, leverage, onPickLeverage, insuranc
 
 function TopUpSheet({ onPick, onClose }) {
   const packages = [
-    { coins: 100, note: 'Paket Kecil' },
-    { coins: 300, note: 'Paket Sedang', badge: 'Populer' },
-    { coins: 750, note: 'Paket Besar' },
-    { coins: 2000, note: 'Paket Jumbo' },
+    { coins: 100, note: 'Small Pack' },
+    { coins: 300, note: 'Medium Pack', badge: 'Popular' },
+    { coins: 750, note: 'Large Pack' },
+    { coins: 2000, note: 'Jumbo Pack' },
   ];
   return (
     <div style={styles.sheetBackdrop} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div style={styles.sheet}>
         <div style={styles.sheetHandle} />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-          <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 17 }}>Top Up Koin</div>
+          <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 17 }}>Top Up Coins</div>
           <button onClick={onClose} style={styles.closeBtn}>✕</button>
         </div>
-        <div style={{ fontSize: 11.5, color: '#8FA69C', marginBottom: 16 }}>Simulasi top-up — belum terhubung ke pembayaran asli.</div>
+        <div style={{ fontSize: 11.5, color: '#8FA69C', marginBottom: 16 }}>Simulated top-up — not connected to real payments yet.</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           {packages.map((p) => (
             <button key={p.coins} onClick={() => onPick(p.coins)} style={styles.topupCard}>
               {p.badge && <div style={styles.topupBadge}>{p.badge}</div>}
-              <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 18, fontWeight: 600, color: '#E8C468' }}>◆ {p.coins.toLocaleString('id-ID')}</div>
+              <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 18, fontWeight: 600, color: '#E8C468' }}>◆ {p.coins.toLocaleString('en-US')}</div>
               <div style={{ fontSize: 10.5, color: '#8FA69C', marginTop: 3 }}>{p.note}</div>
             </button>
           ))}
@@ -1543,20 +1543,20 @@ function ExchangeSheet({ gems, rate, onPick, onClose }) {
       <div style={styles.sheet}>
         <div style={styles.sheetHandle} />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-          <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 17 }}>Tukar Gem</div>
+          <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 17 }}>Exchange Gems</div>
           <button onClick={onClose} style={styles.closeBtn}>✕</button>
         </div>
         <div style={{ fontSize: 11.5, color: '#8FA69C', marginBottom: 16 }}>
-          Kurs saat ini: <span style={{ color: '#4AFFB0', fontFamily: "'IBM Plex Mono', monospace" }}>1 gem = {rate} koin</span> · Kamu punya {gems} gem
+          Current rate: <span style={{ color: '#4AFFB0', fontFamily: "'IBM Plex Mono', monospace" }}>1 gem = {rate} coins</span> · You have {gems} gems
         </div>
         {gems === 0 ? (
-          <div style={{ ...styles.card, textAlign: 'center', color: '#5C7268', fontSize: 12.5, padding: '24px 16px' }}>Gem kamu habis. Kumpulkan gem dulu dari hasil panen premium.</div>
+          <div style={{ ...styles.card, textAlign: 'center', color: '#5C7268', fontSize: 12.5, padding: '24px 16px' }}>You're out of gems. Earn some from premium harvests first.</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {options.map((amt) => (
               <button key={amt} onClick={() => onPick(amt)} style={styles.exchangeRow} disabled={amt > gems}>
-                <span>{amt === gems ? `Semua (${amt} gem)` : `${amt} gem`}</span>
-                <span style={{ color: '#E8C468', fontFamily: "'IBM Plex Mono', monospace" }}>→ {(amt * rate).toLocaleString('id-ID')} koin</span>
+                <span>{amt === gems ? `All (${amt} gems)` : `${amt} gems`}</span>
+                <span style={{ color: '#E8C468', fontFamily: "'IBM Plex Mono', monospace" }}>→ {(amt * rate).toLocaleString('en-US')} coins</span>
               </button>
             ))}
           </div>
