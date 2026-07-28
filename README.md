@@ -1,7 +1,13 @@
-# Kebun Kripto — Telegram Mini App
+# Crypto Farm — Telegram Mini App
 
-Game "Kebun Kripto" dibungkus jadi Telegram Mini App beneran, dengan saldo dan
-leaderboard tersimpan di Redis (Upstash), bukan cuma di local storage.
+A pure farming game (plant → grow → harvest for coins) bundled as a real
+Telegram Mini App, with balances and the leaderboard stored in Redis
+(Upstash) instead of just local storage.
+
+**Note:** this game has no prediction, wagering, or chance-based mechanic —
+every harvest pays out a guaranteed reward (bigger crops just pay more and
+take longer to grow). Coins/gems are virtual and not redeemable for real
+money or crypto.
 
 ## 1. Setup Upstash Redis
 
@@ -80,60 +86,7 @@ setup step is needed so Telegram knows where to send payment events:
 
 If you ever need to check the webhook status: `https://api.telegram.org/bot<BOT_TOKEN>/getWebhookInfo`
 
-## 6. Enable "notify when prediction resolves" (works even with the app closed)
-
-Predictions used to only resolve while the app was open (the browser tab has
-to be running the countdown). Now a server-side job checks for due
-predictions and DMs the player through the bot — but this needs a scheduler
-to actually trigger it.
-
-**⚠️ Important Vercel Hobby (free) plan limitation:** Vercel's free plan
-only allows Cron Jobs to run **once per day**, which is far too infrequent —
-predictions can resolve in as little as 1 minute. `vercel.json` in this
-project does **not** include a `crons` block by default, because Vercel
-rejects the entire deployment if it finds a sub-daily schedule on a Hobby
-account. If you're on Hobby, skip straight to Option B below.
-
-### Option A — Vercel Pro
-1. Make sure `CRON_SECRET` is set in your environment variables.
-2. Add this to `vercel.json`:
-   ```json
-   "crons": [{ "path": "/api/cron-resolve", "schedule": "*/5 * * * *" }]
-   ```
-3. Deploy — Vercel automatically calls `/api/cron-resolve` every 5 minutes,
-   with its own auth, no further setup needed.
-
-### Option B — Free external pinger (works on Vercel Hobby)
-1. Make sure `CRON_SECRET` is set in your environment variables and
-   redeployed.
-2. Go to a free scheduler like https://cron-job.org (or GitHub Actions'
-   `schedule` trigger, or https://www.easycron.com).
-3. Set it to call this URL every 1–5 minutes:
-   ```
-   https://<your-vercel-domain>/api/cron-resolve?secret=<CRON_SECRET>
-   ```
-4. That's it — no code changes needed, the endpoint works the same either
-   way.
-
-### What the player sees
-
-When their prediction resolves while the app is closed, they get a normal
-Telegram message from your bot like:
-
-```
-🌾 Your predictions just resolved:
-
-✅ 🍉 Frozen Watermelon: correct! +140 coins
-
-🎉 Leveled up to Level 3! New farm slot unlocked.
-
-Open Crypto Farm to keep playing 🌱
-```
-
-Reopening the app afterward shows the same updated state — the client just
-pulls whatever the server already resolved.
-
-## 7. 1-tap referral sharing (deep link)
+## 6. 1-tap referral sharing (deep link)
 
 Referral codes can now be shared as a real Telegram link instead of copy-paste
 text.
@@ -149,7 +102,7 @@ text.
 4. The old manual "Enter a friend's code" box is still there too, for people
    who got a code as plain text some other way (e.g. screenshot, voice call).
 
-## 8. Bot commands (/start, /balance, /help)
+## 7. Bot commands (/start, /balance, /help)
 
 The bot now replies to text commands directly in chat — useful for checking
 your balance without even opening the Mini App.
@@ -200,14 +153,20 @@ mereka.
 ## Struktur project
 
 ```
-index.html              — entry HTML, load SDK Telegram
-src/main.jsx            — inisialisasi Telegram + storage shim, render App
-src/telegram.js         — setup Telegram WebApp SDK, ambil identitas user
-src/storageShim.js      — polyfill window.storage → panggil /api/kv
-src/App.jsx             — seluruh game (logic sama persis kayak sebelumnya)
-api/kv.js               — serverless function: get/set/delete/list ke Redis
-api/lib/redis.js        — client Upstash Redis
-api/lib/verifyTelegram.js — verifikasi HMAC initData Telegram
+index.html                 — entry HTML, load SDK Telegram
+src/main.jsx                — inisialisasi Telegram + storage shim, render App
+src/telegram.js              — setup Telegram WebApp SDK, ambil identitas user
+src/storageShim.js           — polyfill window.storage → panggil /api/kv
+src/icons.js                 — icon assets (base64)
+src/App.jsx                  — seluruh game (farm, wallet, leaderboard, dll)
+api/kv.js                    — serverless function: get/set/delete/list ke Redis
+api/create-invoice.js        — bikin link invoice Telegram Stars
+api/telegram-webhook.js      — payment webhook + bot commands (/start, /balance, /help)
+api/lib/redis.js             — client Upstash Redis
+api/lib/verifyTelegram.js    — verifikasi HMAC initData Telegram
+api/lib/telegramApi.js       — helper manggil Bot API
+api/lib/credit.js            — kredit koin langsung di Redis (dipakai webhook)
+api/lib/gameData.js          — helper level-info dipakai /balance
 ```
 
 ## Development lokal
