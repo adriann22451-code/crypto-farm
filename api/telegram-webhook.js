@@ -3,7 +3,7 @@ import { creditCoins, alreadyProcessed, markProcessed } from './lib/credit.js';
 import { redis } from './lib/redis.js';
 import { getLevelInfo } from './lib/gameData.js';
 
-const STATE_KEY = 'kebun-kripto-state-v3';
+const STATE_KEY = 'kebun-kripto-state-v4';
 const MINI_APP_URL = process.env.MINI_APP_URL; // e.g. https://your-app.vercel.app
 
 function openAppButton(label = '🌱 Open Crypto Farm') {
@@ -15,9 +15,9 @@ async function handleStart(chatId) {
   const text = [
     '🌱 <b>Welcome to Crypto Farm!</b>',
     '',
-    'Plant seeds, watch a simulated market move, and lock in predictions on',
-    'which way the price will go before the timeframe closes. Win big, or',
-    "lose small — it's up to your reading of the chart.",
+    'Plant crypto-themed crops, let them grow, and harvest for coins — every',
+    'harvest pays out, no guessing or risk involved. Level up to unlock more',
+    'farm plots, and watch for High Demand events for bonus rewards.',
     '',
     'Tap the button below to start playing.',
   ].join('\n');
@@ -38,15 +38,14 @@ async function handleBalance(chatId, uid) {
     return;
   }
   const level = getLevelInfo(state.xp || 0).level;
-  const pending = (state.predictions || []).filter((p) => !p.resolved).length;
+  const growing = (state.plots || []).filter((p) => p.cropId).length;
   const text = [
     '📊 <b>Your Crypto Farm balance</b>',
     '',
     `◆ Coins: <b>${(state.coins || 0).toLocaleString('en-US')}</b>`,
     `✦ Gems: <b>${state.gems || 0}</b>`,
     `Level: <b>${level}</b>`,
-    `Current streak: <b>${state.streak || 0}</b>`,
-    pending > 0 ? `Predictions in progress: <b>${pending}</b>` : null,
+    growing > 0 ? `Crops growing: <b>${growing}</b>` : null,
   ]
     .filter(Boolean)
     .join('\n');
