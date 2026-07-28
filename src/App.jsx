@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ICON_COIN, ICON_GEM, ICON_LIGHTNING, ICON_LOCK, ICON_STAR } from './icons.js';
+import { ICON_COIN, ICON_GEM, ICON_LIGHTNING, ICON_LOCK, ICON_STAR, ICON_LOGO } from './icons.js';
 
 function Icon({ src, size = 14, style }) {
   return <img src={src} alt="" style={{ width: size, height: size, objectFit: 'contain', display: 'inline-block', verticalAlign: 'middle', ...style }} />;
@@ -140,6 +140,7 @@ const INSURANCE_OPTIONS = [
 const PLOT_COUNT = 9;
 const STORAGE_KEY = 'kebun-kripto-state-v3';
 const PROFILE_KEY = 'kebun-kripto-profile';
+const TUTORIAL_SEEN_KEY = 'kebun-kripto-tutorial-seen';
 function genPlayerId() {
   return 'p' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
 }
@@ -310,6 +311,8 @@ export default function KebunKripto() {
   const autoClaimAttempted = useRef(false);
   const dailyBonusChecked = useRef(false);
   const [screen, setScreen] = useState('kebun');
+  const [showTutorial, setShowTutorial] = useState(false);
+  const tutorialChecked = useRef(false);
   const [now, setNow] = useState(Date.now());
   const animatedCoins = useCountUp(state.coins);
   const animatedGems = useCountUp(state.gems);
@@ -433,6 +436,25 @@ export default function KebunKripto() {
     }
     showToast('✓ Code claimed! +30 gems for you');
   }
+
+  // Show the how-to-play tutorial once on first-ever launch, tracked in
+  // personal storage. Runs once per session after state finishes loading.
+  useEffect(() => {
+    if (!loaded || tutorialChecked.current) return;
+    tutorialChecked.current = true;
+    (async () => {
+      try {
+        const res = await window.storage?.get(TUTORIAL_SEEN_KEY, false);
+        if (!res || !res.value) {
+          setShowTutorial(true);
+          window.storage?.set(TUTORIAL_SEEN_KEY, '1', false).catch(() => {});
+        }
+      } catch (e) {
+        setShowTutorial(true);
+        window.storage?.set(TUTORIAL_SEEN_KEY, '1', false).catch(() => {});
+      }
+    })();
+  }, [loaded]);
 
   // Daily login bonus: grants coins once per calendar day, bigger reward the
   // more consecutive days in a row the person opens the app. Runs once per
@@ -800,7 +822,7 @@ export default function KebunKripto() {
       <div style={styles.device}>
         <div style={styles.topbar}>
           <div style={styles.brand}>
-            <div style={styles.brandMark}>🌱</div>
+            <div style={styles.brandMark}><img src={ICON_LOGO} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /></div>
             <div>
               <div style={styles.brandText}>Crypto Farm</div>
               <div style={styles.brandSub}>
@@ -818,6 +840,7 @@ export default function KebunKripto() {
               <span style={{ ...styles.dot, background: 'rgba(74,255,176,0.15)' }}><Icon src={ICON_GEM} size={11} /></span>
               {animatedGems}
             </div>
+            <button onClick={() => setShowTutorial(true)} style={styles.helpBtn}>?</button>
           </div>
         </div>
 
@@ -908,6 +931,8 @@ export default function KebunKripto() {
 
       {walletSheet === 'topup' && <TopUpSheet onPick={buyWithStars} payingPackage={payingPackage} onClose={() => setWalletSheet(null)} />}
       {walletSheet === 'exchange' && <ExchangeSheet gems={state.gems} rate={GEM_RATE} onPick={exchangeGems} onClose={() => setWalletSheet(null)} />}
+
+      {showTutorial && <TutorialModal onClose={() => setShowTutorial(false)} />}
 
       {toast && <div style={styles.toast}>{toast}</div>}
     </div>
@@ -1399,6 +1424,85 @@ function LeaderboardScreen({ profile, onClaim, showToast }) {
   );
 }
 
+const TUTORIAL_STEPS = [
+  {
+    emoji: '🌱',
+    title: 'Welcome to Crypto Farm',
+    body: 'Plant crypto-themed crops, let them grow, then predict which way a simulated market price will move. Guess right, take the reward. Guess wrong, only lose a little.',
+  },
+  {
+    emoji: '🌾',
+    title: '1. Plant a seed',
+    body: 'Go to the Market tab, buy a seed with coins. It grows on its own over time — even while the app is closed, so check back later.',
+  },
+  {
+    emoji: '🎯',
+    title: '2. Harvest & predict',
+    body: "When a plot shows PANEN, tap it. Pick a timeframe (1–15 minutes), then guess Up or Down for where the price lands when that timeframe's candle closes.",
+  },
+  {
+    emoji: '🎲',
+    title: '3. Leverage & Insurance (optional)',
+    body: 'Stake extra upfront for a bigger reward if you\u2019re right (Leverage), or pay a small premium to soften the loss if you\u2019re wrong (Insurance). Both are optional — 1× with no insurance is always free.',
+  },
+  {
+    emoji: '🔥',
+    title: 'Streaks & Volatile events',
+    body: 'Win predictions back-to-back to build a streak bonus — one miss resets it. Watch the ticker for ⚡ Volatile events too: locking in a prediction on that asset while it\u2019s active pays extra.',
+  },
+  {
+    emoji: '⭐',
+    title: 'Level up & achievements',
+    body: 'Every prediction earns XP — leveling up unlocks more farm plots (up to 9). Achievements hand out bonus gems. Check the Board tab for the leaderboard and your referral code.',
+  },
+];
+
+function TutorialModal({ onClose }) {
+  const [step, setStep] = useState(0);
+  const isLast = step === TUTORIAL_STEPS.length - 1;
+  const current = TUTORIAL_STEPS[step];
+
+  return (
+    <div style={styles.sheetBackdrop}>
+      <div style={{ ...styles.sheet, paddingBottom: 24 }}>
+        <div style={styles.sheetHandle} />
+        <div style={{ textAlign: 'center', padding: '8px 8px 4px' }}>
+          <div style={{ fontSize: 46, marginBottom: 10 }}>{current.emoji}</div>
+          <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 18, marginBottom: 10 }}>{current.title}</div>
+          <div style={{ fontSize: 13, color: '#8FA69C', lineHeight: 1.6, padding: '0 4px' }}>{current.body}</div>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, margin: '20px 0' }}>
+          {TUTORIAL_STEPS.map((_, i) => (
+            <div key={i} style={{ width: i === step ? 18 : 6, height: 6, borderRadius: 100, background: i === step ? '#4AFFB0' : '#223530', transition: 'all 0.2s ease' }} />
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', gap: 10 }}>
+          {step > 0 && (
+            <button onClick={() => setStep((s) => s - 1)} style={{ ...styles.btnGhost, flex: 1 }}>
+              Back
+            </button>
+          )}
+          <button
+            onClick={() => (isLast ? onClose() : setStep((s) => s + 1))}
+            style={{ ...styles.btnMint, flex: step > 0 ? 1 : undefined, width: step > 0 ? undefined : '100%', padding: '11px 0' }}
+          >
+            {isLast ? "Let's play!" : 'Next'}
+          </button>
+        </div>
+        {!isLast && (
+          <div style={{ textAlign: 'center', marginTop: 12 }}>
+            <span onClick={onClose} style={{ fontSize: 11.5, color: '#5C7268', cursor: 'pointer', textDecoration: 'underline' }}>
+              Skip
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function WalletScreen({ coins, gems, tx, onTopUp, onExchange }) {
   return (
     <>
@@ -1709,7 +1813,7 @@ const styles = {
   device: { width: '100%', maxWidth: 430, minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative' },
   topbar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 18px 10px', position: 'relative', zIndex: 2 },
   brand: { display: 'flex', alignItems: 'center', gap: 9 },
-  brandMark: { width: 32, height: 32, borderRadius: 9, background: 'linear-gradient(135deg, #4AFFB0 0%, #1F8F6B 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, boxShadow: '0 0 18px rgba(74,255,176,0.35)' },
+  brandMark: { width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', filter: 'drop-shadow(0 0 10px rgba(74,255,176,0.35))' },
   brandText: { fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 16.5, letterSpacing: '-0.01em' },
   brandSub: { fontSize: 10, color: '#5C7268', fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase', marginTop: -1 },
   pill: { display: 'flex', alignItems: 'center', gap: 6, background: '#131F1B', border: '1px solid #223530', padding: '7px 11px 7px 8px', borderRadius: 100, fontFamily: "'IBM Plex Mono', monospace", fontSize: 12.5, fontWeight: 600 },
@@ -1725,6 +1829,7 @@ const styles = {
   streakBar: { display: 'flex', alignItems: 'center', gap: 10, margin: '10px 18px 0', background: 'linear-gradient(135deg, rgba(232,196,104,0.12), rgba(74,255,176,0.08))', border: '1px solid #3A3020', borderRadius: 14, padding: '10px 14px', position: 'relative', zIndex: 2 },
   levelBar: { display: 'flex', alignItems: 'center', gap: 10, margin: '10px 18px 0', background: '#131F1B', border: '1px solid #223530', borderRadius: 14, padding: '10px 14px', position: 'relative', zIndex: 2 },
   levelBadge: { fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 13, color: '#06231A', background: '#4AFFB0', borderRadius: 8, padding: '4px 9px', flexShrink: 0 },
+  helpBtn: { width: 26, height: 26, borderRadius: '50%', background: '#131F1B', border: '1px solid #223530', color: '#8FA69C', fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   xpTrack: { width: '100%', height: 6, background: '#182B25', borderRadius: 100, overflow: 'hidden' },
   xpFill: { height: '100%', background: 'linear-gradient(90deg, #2A6B54, #4AFFB0)', borderRadius: 100, transition: 'width 0.5s ease' },
   eventBadge: { background: 'linear-gradient(135deg, rgba(232,196,104,0.15), rgba(255,107,92,0.08))', border: '1px solid #4A3A20', borderRadius: 10, padding: '8px 12px', fontSize: 11, color: '#E8C468', marginBottom: 10, lineHeight: 1.4 },
@@ -1750,7 +1855,7 @@ const styles = {
   navItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 600, padding: '4px 14px', position: 'relative', cursor: 'pointer', background: 'none', border: 'none', fontFamily: "'Inter', sans-serif" },
   navIndicator: { position: 'absolute', top: -13, left: '50%', transform: 'translateX(-50%)', width: 18, height: 2.5, background: '#4AFFB0', borderRadius: 4, boxShadow: '0 0 8px rgba(74,255,176,0.6)' },
   sheetBackdrop: { position: 'fixed', inset: 0, background: 'rgba(4,8,7,0.7)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 50 },
-  sheet: { width: '100%', maxWidth: 430, background: '#131F1B', borderTop: '1px solid #223530', borderRadius: '24px 24px 0 0', padding: '22px 20px 26px' },
+  sheet: { width: '100%', maxWidth: 430, background: '#131F1B', borderTop: '1px solid #223530', borderRadius: '24px 24px 0 0', padding: '22px 20px calc(26px + env(safe-area-inset-bottom))' },
   sheetHandle: { width: 36, height: 4, background: '#223530', borderRadius: 10, margin: '0 auto 18px' },
   closeBtn: { width: 28, height: 28, borderRadius: '50%', background: '#182B25', border: '1px solid #223530', color: '#8FA69C', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   predictBtn: { flex: 1, padding: '16px 0', borderRadius: 14, border: '1px solid #223530', background: '#182B25', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 14, cursor: 'pointer', color: '#EAF3EE' },
