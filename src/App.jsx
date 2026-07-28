@@ -5,11 +5,11 @@ function Icon({ src, size = 14, style }) {
   return <img src={src} alt="" style={{ width: size, height: size, objectFit: 'contain', display: 'inline-block', verticalAlign: 'middle', ...style }} />;
 }
 
-/* ================== Deterministic market simulation ==================
-   Same function drives the ticker, every sparkline, AND prediction grading.
-   Given an asset id and a timestamp, priceIndexAt() always returns the same
-   value — so a prediction locked at time A and graded at time B is judged
-   against a real, reproducible market path, not a fresh coin flip.
+/* ================== Deterministic "market mood" engine ==================
+   Purely decorative now — there is no wager tied to this anymore. It just
+   drives the ticker/sparkline visuals and gates when a "High Demand" event
+   gives a harvest bonus. Same value for everyone at a given moment (seeded
+   by timestamp), so it feels alive without needing a real price feed.
 ======================================================================= */
 function hashStr(s) {
   let h = 2166136261;
@@ -32,45 +32,26 @@ function mulberry32(seed) {
 function noiseAt(assetSeed, bucketIndex) {
   return mulberry32((assetSeed ^ (bucketIndex * 2654435761)) >>> 0)();
 }
-const BUCKET_SEC = 6; // resolution of the underlying random walk
-function priceIndexAt(assetId, timeMs) {
+const BUCKET_SEC = 6;
+function moodIndexAt(assetId, timeMs) {
   const seed = hashStr(assetId);
   const t = timeMs / 1000 / BUCKET_SEC;
   const i0 = Math.floor(t);
   const i1 = i0 + 1;
   const frac = t - i0;
-  // smoothstep interpolation for a less jagged path
   const s = frac * frac * (3 - 2 * frac);
   const n0 = noiseAt(seed, i0);
   const n1 = noiseAt(seed, i1);
   const base = n0 + (n1 - n0) * s;
-  // add a slower drift wave per-asset so trends persist longer than one bucket
-  const drift = Math.sin(timeMs / 1000 / 90 + seed % 100) * 0.15;
-  return base + drift; // roughly -0.15..1.15
-}
-
-/* In-game simulated price display. This is NOT a real market feed — it's the
-   same priceIndexAt() engine mapped onto a realistic-looking base price per
-   asset, purely so the ticker/market feel like they reference an actual
-   number instead of just a bare percentage. */
-const ASSET_BASE_PRICE = { btc: 68000, eth: 3400, sol: 145, ada: 0.62, dot: 6.8, avax: 28 };
-const ASSET_VOLATILITY = { btc: 0.18, eth: 0.22, sol: 0.35, ada: 0.3, dot: 0.28, avax: 0.32 };
-function getDisplayPrice(assetId, timeMs) {
-  const idx = priceIndexAt(assetId, timeMs);
-  const base = ASSET_BASE_PRICE[assetId] || 100;
-  const vol = ASSET_VOLATILITY[assetId] || 0.2;
-  return base * (1 + idx * vol);
-}
-function fmtPrice(price) {
-  if (price >= 1000) return price.toLocaleString('en-US', { maximumFractionDigits: 0 });
-  if (price >= 1) return price.toFixed(2);
-  return price.toFixed(4);
+  const drift = Math.sin(timeMs / 1000 / 90 + (seed % 100)) * 0.15;
+  return base + drift;
 }
 
 /* ---------------- Game data ---------------- */
 /* Grow duration scales with seed price: pricier seeds = longer wait, so the
    cost of a seed is felt in time invested, not just currency spent.
-   Fastest crop is floored at 1 minute so nothing feels instant. */
+   Fastest crop is floored at 1 minute so nothing feels instant. Harvesting
+   ALWAYS pays out — there is no losing outcome, just bigger or smaller crops. */
 const CROPS = {
   gandum:   { id: 'gandum',   icon: '🌾', name: 'Glowing Wheat', tier: 'ETH-tier', asset: 'eth', growSec: 60,  baseValue: 70,  seedCost: 40, seedCurrency: 'coins' },
   jagung:   { id: 'jagung',   icon: '🌽', name: 'Neon Corn',   tier: 'ADA-tier', asset: 'ada', growSec: 95,  baseValue: 95,  seedCost: 55, seedCurrency: 'coins' },
@@ -80,12 +61,6 @@ const CROPS = {
   nanas:    { id: 'nanas',    icon: '🍍', name: 'Prime Pineapple',   tier: 'AVAX-tier',asset: 'avax', growSec: 580, baseValue: 220, seedCost: 6, seedCurrency: 'gems' },
 };
 
-/* Seasonal crops: a rotating pool where only ONE is purchasable per real-world
-   day (deterministic from the calendar date, so it's the same for everyone
-   and genuinely rotates away at midnight). Definitions stay around permanently
-   so a plant started while featured still resolves correctly after rotation
-   moves on — only the "available to buy" gate is time-limited. Econ is
-   noticeably better than regular crops to justify the FOMO. */
 const SEASONAL_CROPS = {
   melon_emas:    { id: 'melon_emas',    icon: '🍈', name: 'Gold Melon',     tier: 'BTC-tier', asset: 'btc', growSec: 240, baseValue: 260, seedCost: 100, seedCurrency: 'coins', seasonal: true },
   kelapa_kilau:  { id: 'kelapa_kilau',  icon: '🥥', name: 'Shimmer Coconut',   tier: 'ETH-tier', asset: 'eth', growSec: 150, baseValue: 165, seedCost: 65,  seedCurrency: 'coins', seasonal: true },
@@ -109,44 +84,10 @@ function getCrop(id) {
   return CROPS[id] || SEASONAL_CROPS[id];
 }
 
-
-const TIMEFRAMES = [
-  { key: '1m', label: '1 Minute', sec: 60, multiplier: 1.0 },
-  { key: '3m', label: '3 Minutes', sec: 180, multiplier: 1.3 },
-  { key: '5m', label: '5 Minutes', sec: 300, multiplier: 1.6 },
-  { key: '15m', label: '15 Minutes', sec: 900, multiplier: 2.5 },
-];
-
-/* Leverage: stake extra coins upfront for a bigger reward multiplier, at the
-   cost of a much harsher downside if the guess is wrong. 1x is the default,
-   free option with no upfront stake (same behavior as before leverage existed). */
-const LEVERAGE_OPTIONS = [
-  { key: '1x', label: '1×', stakePct: 0, rewardMult: 1, lossMult: 0.1, desc: 'Normal, no extra stake' },
-  { key: '2x', label: '2×', stakePct: 0.5, rewardMult: 2, lossMult: 0, desc: 'Stake 50% of base value' },
-  { key: '3x', label: '3×', stakePct: 1.0, rewardMult: 3, lossMult: 0, desc: 'Stake 100% of base value' },
-];
-
-/* Insurance: pay a small non-refundable premium upfront (charged regardless of
-   outcome, like real insurance) in exchange for a bigger guaranteed floor if
-   the guess turns out wrong. Stacks on top of whatever leverage tier was
-   picked — it only raises the loss-multiplier, capped so it never approaches
-   the win payout. */
-const INSURANCE_OPTIONS = [
-  { key: 'none', label: 'No Insurance', costPct: 0, lossBonus: 0, desc: 'No extra protection' },
-  { key: 'basic', label: 'Basic', costPct: 0.15, lossBonus: 0.2, desc: 'Premium 15% · +20% guaranteed return if wrong' },
-  { key: 'premium', label: 'Premium', costPct: 0.3, lossBonus: 0.4, desc: 'Premium 30% · +40% guaranteed return if wrong' },
-];
-
 const PLOT_COUNT = 9;
-const STORAGE_KEY = 'kebun-kripto-state-v3';
+const STORAGE_KEY = 'kebun-kripto-state-v4';
 const PROFILE_KEY = 'kebun-kripto-profile';
 const TUTORIAL_SEEN_KEY = 'kebun-kripto-tutorial-seen';
-function genPlayerId() {
-  return 'p' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
-}
-function genNickname(id) {
-  return 'Farmer#' + id.slice(-4).toUpperCase();
-}
 
 function emptyPlots() {
   return Array.from({ length: PLOT_COUNT }, (_, i) => ({ id: i, cropId: null, plantedAt: null }));
@@ -157,16 +98,13 @@ function defaultState() {
     gems: 12,
     plots: emptyPlots(),
     tx: [],
-    predictions: [],
-    streak: 0,
     xp: 0,
-    marketEvents: [],
-    stats: { totalPredictions: 0, totalCorrect: 0, bestStreak: 0, totalCoinsEarned: 0, eventWins: 0 },
+    demandEvents: [],
+    stats: { totalHarvests: 0, totalPlanted: 0, totalCoinsEarned: 0 },
     unlockedAchievements: [],
     dailyLogin: { lastClaimDay: null, streak: 0 },
   };
 }
-
 function getDateKey(timeMs) {
   const d = new Date(timeMs);
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
@@ -175,29 +113,16 @@ function getDailyBonusAmount(streak) {
   return Math.min(20 + (streak - 1) * 15, 150);
 }
 
-const ACHIEVEMENTS = [
-  { id: 'first_guess', icon: '🌱', name: 'First Harvest', desc: 'Complete 1 prediction', reward: 2, check: (s) => s.totalPredictions >= 1 },
-  { id: 'correct_10', icon: '🎯', name: 'Sharp Shooter', desc: '10 correct predictions', reward: 5, check: (s) => s.totalCorrect >= 10 },
-  { id: 'correct_50', icon: '🏹', name: 'Eagle Eye', desc: '50 correct predictions', reward: 15, check: (s) => s.totalCorrect >= 50 },
-  { id: 'streak_5', icon: '🔥', name: 'On Fire', desc: '5 correct predictions in a row', reward: 10, check: (s) => s.bestStreak >= 5 },
-  { id: 'streak_10', icon: '💥', name: 'Unstoppable', desc: '10 correct predictions in a row', reward: 25, check: (s) => s.bestStreak >= 10 },
-  { id: 'event_hunter', icon: '⚡', name: 'Volatility Hunter', desc: 'Win 5x during an active volatile event', reward: 15, check: (s) => s.eventWins >= 5 },
-  { id: 'earn_2000', icon: '💰', name: 'Getting Rich', desc: 'Total earnings of 2,000 coins', reward: 20, check: (s) => s.totalCoinsEarned >= 2000 },
-  { id: 'earn_5000', icon: '👑', name: 'Farm Sultan', desc: 'Total earnings of 5,000 coins', reward: 30, check: (s) => s.totalCoinsEarned >= 5000 },
-  { id: 'consistent_100', icon: '📈', name: 'Consistent', desc: 'Complete 100 predictions', reward: 40, check: (s) => s.totalPredictions >= 100 },
-];
-
-
-const EVENT_ASSETS = ['btc', 'eth', 'sol', 'ada', 'dot', 'avax'];
+/* Demand events: sometimes an asset tier goes "High Demand" for a while,
+   giving an automatic bonus to any harvest of crops tied to that tier while
+   it's active. No lock-in, no choice, no downside — just a nice bonus if
+   your timing happens to line up. */
+const DEMAND_ASSETS = ['btc', 'eth', 'sol', 'ada', 'dot', 'avax'];
 const ASSET_TIER_NAMES = { btc: 'BTC-tier', eth: 'ETH-tier', sol: 'SOL-tier', ada: 'ADA-tier', dot: 'DOT-tier', avax: 'AVAX-tier' };
-function getActiveEventForAsset(marketEvents, asset, now) {
-  return (marketEvents || []).find((e) => e.asset === asset && now >= e.startAt && now < e.endAt) || null;
+function getActiveDemandForAsset(demandEvents, asset, now) {
+  return (demandEvents || []).find((e) => e.asset === asset && now >= e.startAt && now < e.endAt) || null;
 }
 
-/* Level curve: cumulative XP needed to REACH each level, plus how many farm
-   plots are unlocked at that level. Starts at 4 plots, unlocks the rest as
-   you level up, capping at all 9 by level 6. Levels beyond 6 still grow XP
-   for a sense of ongoing progress, with a bonus gem every level. */
 const LEVELS = [
   { level: 1, xp: 0, plots: 4 },
   { level: 2, xp: 150, plots: 5 },
@@ -208,7 +133,7 @@ const LEVELS = [
 ];
 function xpForLevel(level) {
   if (level <= 6) return LEVELS[level - 1].xp;
-  return 1800 + (level - 6) * 700; // keeps growing past max plot unlock
+  return 1800 + (level - 6) * 700;
 }
 function getLevelInfo(xp) {
   let level = 1;
@@ -225,58 +150,17 @@ function getLevelInfo(xp) {
   };
 }
 
-const STREAK_BONUS_PER_LEVEL = 0.1; // +10% reward per consecutive correct guess
-const STREAK_BONUS_CAP = 5; // caps at +50% (streak of 6+)
+const ACHIEVEMENTS = [
+  { id: 'first_harvest', icon: '🌱', name: 'First Harvest', desc: 'Harvest your first crop', reward: 2, check: (s) => s.totalHarvests >= 1 },
+  { id: 'harvest_10', icon: '🎯', name: 'Green Thumb', desc: 'Harvest 10 crops', reward: 5, check: (s) => s.totalHarvests >= 10 },
+  { id: 'harvest_50', icon: '🏹', name: 'Master Grower', desc: 'Harvest 50 crops', reward: 15, check: (s) => s.totalHarvests >= 50 },
+  { id: 'harvest_100', icon: '📈', name: 'Consistent', desc: 'Harvest 100 crops', reward: 40, check: (s) => s.totalHarvests >= 100 },
+  { id: 'planted_25', icon: '🌾', name: 'Busy Hands', desc: 'Plant 25 seeds total', reward: 10, check: (s) => s.totalPlanted >= 25 },
+  { id: 'demand_hunter', icon: '⚡', name: 'Perfect Timing', desc: 'Harvest 5 crops during a High Demand event', reward: 15, check: (s) => s.demandWins >= 5 },
+  { id: 'earn_2000', icon: '💰', name: 'Getting Rich', desc: 'Total earnings of 2,000 coins', reward: 20, check: (s) => s.totalCoinsEarned >= 2000 },
+  { id: 'earn_5000', icon: '👑', name: 'Farm Sultan', desc: 'Total earnings of 5,000 coins', reward: 30, check: (s) => s.totalCoinsEarned >= 5000 },
+];
 
-/* ---------------- Sparkline driven by the real price engine ---------------- */
-function Sparkline({ assetId, now, windowSec = 90, height = '100%', opacity = 0.55, strokeWidth = 2.5, forceColor = null }) {
-  const ref = useRef(null);
-  useEffect(() => {
-    const canvas = ref.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const w = (canvas.width = canvas.offsetWidth * 2);
-    const h = (canvas.height = canvas.offsetHeight * 2);
-    ctx.clearRect(0, 0, w, h);
-    const points = 24;
-    const values = [];
-    for (let i = 0; i <= points; i++) {
-      const t = now - windowSec * 1000 + (windowSec * 1000 * i) / points;
-      values.push(priceIndexAt(assetId, t));
-    }
-    const min = Math.min(...values), max = Math.max(...values);
-    const range = Math.max(0.05, max - min);
-    const positive = values[values.length - 1] >= values[0];
-    ctx.strokeStyle = forceColor || (positive ? 'rgba(74,255,176,0.55)' : 'rgba(255,107,92,0.45)');
-    ctx.lineWidth = strokeWidth;
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-    values.forEach((v, i) => {
-      const x = (w / points) * i;
-      const norm = (v - min) / range;
-      const y = h * 0.85 - norm * h * 0.7;
-      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-  }, [assetId, now, windowSec, forceColor]);
-  return <canvas ref={ref} style={{ position: 'absolute', inset: 0, width: '100%', height, opacity }} />;
-}
-
-function fmtCountdown(ms) {
-  if (ms <= 0) return '00:00';
-  const totalSec = Math.ceil(ms / 1000);
-  const m = Math.floor(totalSec / 60);
-  const s = totalSec % 60;
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
-function fmtGrowDuration(sec) {
-  if (sec < 60) return `${sec}s`;
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return s === 0 ? `${m}m` : `${m}m ${s}s`;
-}
-
-/* ---------------- Main App ---------------- */
 function useCountUp(value, duration = 550) {
   const [display, setDisplay] = useState(value);
   const prevRef = useRef(value);
@@ -303,26 +187,65 @@ function useCountUp(value, duration = 550) {
   return display;
 }
 
+/* ---------------- Sparkline driven by the mood engine (decorative) ---------------- */
+function Sparkline({ assetId, now, windowSec = 90, height = '100%', opacity = 0.55, strokeWidth = 2.5 }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = (canvas.width = canvas.offsetWidth * 2);
+    const h = (canvas.height = canvas.offsetHeight * 2);
+    ctx.clearRect(0, 0, w, h);
+    const points = 24;
+    const values = [];
+    for (let i = 0; i <= points; i++) {
+      const t = now - windowSec * 1000 + (windowSec * 1000 * i) / points;
+      values.push(moodIndexAt(assetId, t));
+    }
+    const min = Math.min(...values), max = Math.max(...values);
+    const range = Math.max(0.05, max - min);
+    const positive = values[values.length - 1] >= values[0];
+    ctx.strokeStyle = positive ? 'rgba(74,255,176,0.55)' : 'rgba(255,107,92,0.45)';
+    ctx.lineWidth = strokeWidth;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    values.forEach((v, i) => {
+      const x = (w / points) * i;
+      const norm = (v - min) / range;
+      const y = h * 0.85 - norm * h * 0.7;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  }, [assetId, now, windowSec]);
+  return <canvas ref={ref} style={{ position: 'absolute', inset: 0, width: '100%', height, opacity }} />;
+}
+
+function fmtGrowDuration(sec) {
+  if (sec < 60) return `${sec}s`;
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return s === 0 ? `${m}m` : `${m}m ${s}s`;
+}
+
+/* ---------------- Main App ---------------- */
 export default function KebunKripto() {
   const [state, setState] = useState(defaultState());
   const [loaded, setLoaded] = useState(false);
-  const [profile, setProfile] = useState(null); // { playerId, nickname }
+  const [profile, setProfile] = useState(null);
   const [claimedReferrals, setClaimedReferrals] = useState([]);
   const autoClaimAttempted = useRef(false);
-  const dailyBonusChecked = useRef(false);
   const [screen, setScreen] = useState('kebun');
   const [showTutorial, setShowTutorial] = useState(false);
-  const [rewardEffect, setRewardEffect] = useState(null); // { icon: 'coin'|'gem', amount } | null
   const tutorialChecked = useRef(false);
+  const dailyBonusChecked = useRef(false);
+  const [rewardEffect, setRewardEffect] = useState(null);
   const [now, setNow] = useState(Date.now());
   const animatedCoins = useCountUp(state.coins);
   const animatedGems = useCountUp(state.gems);
-  const [sheetPlot, setSheetPlot] = useState(null);
-  const [sheetTimeframe, setSheetTimeframe] = useState(null);
-  const [sheetLeverage, setSheetLeverage] = useState(LEVERAGE_OPTIONS[0]);
-  const [sheetInsurance, setSheetInsurance] = useState(INSURANCE_OPTIONS[0]);
   const [seedPickerPlot, setSeedPickerPlot] = useState(null);
-  const [walletSheet, setWalletSheet] = useState(null); // null | 'topup' | 'exchange'
+  const [walletSheet, setWalletSheet] = useState(null);
+  const [payingPackage, setPayingPackage] = useState(null);
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
   const stateRef = useRef(state);
@@ -337,16 +260,12 @@ export default function KebunKripto() {
           setState({ ...defaultState(), ...parsed });
         }
       } catch (e) {
-        /* first run, no saved state */
+        /* first run */
       }
       try {
-        // Identity comes from Telegram (set by main.jsx from initDataUnsafe.user),
-        // not a locally generated random id — this way the leaderboard/referral
-        // system is tied to the person's real Telegram account across devices.
         const tgUser = window.__TG_USER__ || null;
         const playerId = tgUser?.id ? String(tgUser.id) : genPlayerId();
         const nickname = tgUser?.username ? `@${tgUser.username}` : tgUser?.first_name || genNickname(playerId);
-
         const profRes = await window.storage?.get(PROFILE_KEY, false);
         if (profRes && profRes.value) {
           const parsedProf = JSON.parse(profRes.value);
@@ -372,7 +291,6 @@ export default function KebunKripto() {
     window.storage?.set(STORAGE_KEY, JSON.stringify(state), false).catch(() => {});
   }, [state, loaded]);
 
-  // sync this player's leaderboard entry to shared storage (visible to everyone using this artifact)
   useEffect(() => {
     if (!loaded || !profile) return;
     (async () => {
@@ -380,21 +298,18 @@ export default function KebunKripto() {
       try {
         const existing = await window.storage?.get(`leaderboard:${profile.playerId}`, true);
         if (existing && existing.value) existingReferrals = JSON.parse(existing.value).referrals || 0;
-      } catch (e) {
-        /* no existing entry yet */
-      }
+      } catch (e) {}
       const level = getLevelInfo(state.xp || 0).level;
-      const entry = {
-        nickname: profile.nickname,
-        coins: state.coins,
-        xp: state.xp || 0,
-        level,
-        referrals: existingReferrals,
-        updatedAt: Date.now(),
-      };
+      const entry = { nickname: profile.nickname, coins: state.coins, xp: state.xp || 0, level, referrals: existingReferrals, updatedAt: Date.now() };
       window.storage?.set(`leaderboard:${profile.playerId}`, JSON.stringify(entry), true).catch(() => {});
     })();
   }, [state.coins, state.xp, profile, loaded]);
+
+  const showToast = useCallback((msg) => {
+    setToast(msg);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2600);
+  }, []);
 
   async function claimReferral(codeInput) {
     const code = (codeInput || '').trim();
@@ -432,14 +347,10 @@ export default function KebunKripto() {
     try {
       referrerEntry.referrals = (referrerEntry.referrals || 0) + 1;
       window.storage.set(`leaderboard:${code}`, JSON.stringify(referrerEntry), true).catch(() => {});
-    } catch (e) {
-      /* best effort */
-    }
+    } catch (e) {}
     showToast('✓ Code claimed! +30 gems for you');
   }
 
-  // Show the how-to-play tutorial once on first-ever launch, tracked in
-  // personal storage. Runs once per session after state finishes loading.
   useEffect(() => {
     if (!loaded || tutorialChecked.current) return;
     tutorialChecked.current = true;
@@ -457,37 +368,26 @@ export default function KebunKripto() {
     })();
   }, [loaded]);
 
-  // Daily login bonus: grants coins once per calendar day, bigger reward the
-  // more consecutive days in a row the person opens the app. Runs once per
-  // session, right after state finishes loading.
   useEffect(() => {
     if (!loaded || dailyBonusChecked.current) return;
     dailyBonusChecked.current = true;
-
-    const now = Date.now();
-    const todayKey = getDateKey(now);
-    const yesterdayKey = getDateKey(now - 86400000);
+    const nowT = Date.now();
+    const todayKey = getDateKey(nowT);
+    const yesterdayKey = getDateKey(nowT - 86400000);
     const daily = state.dailyLogin || { lastClaimDay: null, streak: 0 };
-
-    if (daily.lastClaimDay === todayKey) return; // already claimed today
-
+    if (daily.lastClaimDay === todayKey) return;
     const newStreak = daily.lastClaimDay === yesterdayKey ? daily.streak + 1 : 1;
     const bonus = getDailyBonusAmount(newStreak);
-
     setState((s) => ({
       ...s,
       coins: s.coins + bonus,
       dailyLogin: { lastClaimDay: todayKey, streak: newStreak },
-      tx: [
-        { icon: '📅', title: `Daily login bonus · Day ${newStreak}`, value: `+${bonus}`, dir: 'in', time: 'Just now' },
-        ...s.tx,
-      ].slice(0, 20),
+      tx: [{ icon: '📅', title: `Daily login bonus · Day ${newStreak}`, value: `+${bonus}`, dir: 'in', time: 'Just now' }, ...s.tx].slice(0, 20),
     }));
     showToast(`📅 Daily bonus! Day ${newStreak} streak · +${bonus} coins`);
   }, [loaded]);
 
-  // If the app was opened via a shared deep link (t.me/<bot>?startapp=CODE),
-  // auto-claim that code once — no typing required on the friend's end.
+
   useEffect(() => {
     if (!loaded || !profile || autoClaimAttempted.current) return;
     const startParam = window.__TG_START_PARAM__;
@@ -499,127 +399,29 @@ export default function KebunKripto() {
     }
   }, [loaded, profile, claimedReferrals]);
 
-  const showToast = useCallback((msg) => {
-    setToast(msg);
-    clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), 2600);
-  }, []);
-
-  // master clock: growth progress + prediction resolution
+  // master clock: growth progress + demand event spawn/expiry
   useEffect(() => {
     const id = setInterval(() => {
       const t = Date.now();
       setNow(t);
       const s = stateRef.current;
 
-      // market events: expire old ones, occasionally spawn a new volatile event
-      const activeEvents = (s.marketEvents || []).filter((e) => t < e.endAt);
+      const activeEvents = (s.demandEvents || []).filter((e) => t < e.endAt);
       const busyAssets = new Set(activeEvents.map((e) => e.asset));
-      const freeAssets = EVENT_ASSETS.filter((a) => !busyAssets.has(a));
+      const freeAssets = DEMAND_ASSETS.filter((a) => !busyAssets.has(a));
       let spawned = null;
       if (freeAssets.length > 0 && Math.random() < 0.006) {
         const asset = freeAssets[Math.floor(Math.random() * freeAssets.length)];
-        const duration = 60 + Math.floor(Math.random() * 60); // 60-120s
-        const multiplier = 1.3 + Math.random() * 0.5; // 1.3x - 1.8x
+        const duration = 60 + Math.floor(Math.random() * 60);
+        const multiplier = 1.3 + Math.random() * 0.5;
         spawned = { asset, multiplier, startAt: t, endAt: t + duration * 1000 };
       }
-      if (spawned || activeEvents.length !== (s.marketEvents || []).length) {
+      if (spawned || activeEvents.length !== (s.demandEvents || []).length) {
         const nextEvents = spawned ? [...activeEvents, spawned] : activeEvents;
-        setState((prev) => ({ ...prev, marketEvents: nextEvents }));
+        setState((prev) => ({ ...prev, demandEvents: nextEvents }));
         if (spawned) {
-          showToast(`🔥 ${ASSET_TIER_NAMES[spawned.asset]} is Volatile! Reward ×${spawned.multiplier.toFixed(1)} for ${Math.round((spawned.endAt - spawned.startAt) / 1000)}s`);
+          showToast(`⚡ ${ASSET_TIER_NAMES[spawned.asset]} is in High Demand! Harvest bonus ×${spawned.multiplier.toFixed(1)} for ${Math.round((spawned.endAt - spawned.startAt) / 1000)}s`);
         }
-      }
-
-      const due = s.predictions.filter((p) => !p.resolved && t >= p.resolveAt);
-      if (due.length > 0) {
-        setState((prev) => {
-          let coins = prev.coins;
-          let streak = prev.streak || 0;
-          let xp = prev.xp || 0;
-          const prevLevel = getLevelInfo(xp).level;
-          const newTx = [];
-          const resultById = new Map();
-          const stats = { ...(prev.stats || { totalPredictions: 0, totalCorrect: 0, bestStreak: 0, totalCoinsEarned: 0, eventWins: 0 }) };
-
-          // process in the order the timeframes actually closed, so streak accumulates correctly
-          const orderedDue = [...due].sort((a, b) => a.resolveAt - b.resolveAt);
-          orderedDue.forEach((p) => {
-            const crop = getCrop(p.cropId);
-            const openIdx = priceIndexAt(crop.asset, p.lockedAt);
-            const closeIdx = priceIndexAt(crop.asset, p.resolveAt);
-            const actualUp = closeIdx >= openIdx;
-            const correct = (p.direction === 'up') === actualUp;
-            const mult = p.multiplier || 1.0;
-            const eventMult = p.eventMultiplier || 1.0;
-            const rewardMult = p.rewardMult || 1;
-            const lossMult = p.lossMult != null ? p.lossMult : 0.1;
-
-            let reward;
-            let streakBonusPct = 0;
-            if (correct) {
-              streak += 1;
-              streakBonusPct = Math.min(streak - 1, STREAK_BONUS_CAP) * STREAK_BONUS_PER_LEVEL;
-              reward = Math.round(crop.baseValue * mult * eventMult * (1 + streakBonusPct) * rewardMult);
-              xp += Math.round(12 * mult);
-              stats.totalCorrect += 1;
-              if (eventMult > 1) stats.eventWins += 1;
-            } else {
-              streak = 0;
-              reward = Math.round(crop.baseValue * mult * eventMult * lossMult);
-              xp += 3;
-            }
-            stats.totalPredictions += 1;
-            stats.bestStreak = Math.max(stats.bestStreak, streak);
-            stats.totalCoinsEarned += reward;
-            coins += reward;
-            newTx.push({
-              icon: correct ? '🎯' : crop.icon,
-              title: correct
-                ? `Correct guess · ${crop.name} (${p.timeframeLabel})${streakBonusPct > 0 ? ` · 🔥+${Math.round(streakBonusPct * 100)}%` : ''}${eventMult > 1 ? ` · ⚡×${eventMult.toFixed(1)}` : ''}${rewardMult > 1 ? ` · 🎲${p.leverageKey}` : ''}`
-                : `Wrong guess · ${crop.name} (${p.timeframeLabel})${rewardMult > 1 ? ` · 🎲${p.leverageKey} stake forfeited` : ''}${p.insuranceKey && p.insuranceKey !== 'none' ? ` · 🛡️ ${p.insuranceKey} insurance` : ''}`,
-              value: `+${reward}`,
-              dir: 'in',
-              time: 'Just now',
-            });
-            resultById.set(p.id, { correct, reward, actualUp });
-          });
-
-          const nextPredictions = prev.predictions.map((p) => {
-            const res = resultById.get(p.id);
-            return res ? { ...p, resolved: true, ...res } : p;
-          });
-
-          const alreadyUnlocked = new Set(prev.unlockedAchievements || []);
-          const newlyUnlocked = ACHIEVEMENTS.filter((a) => !alreadyUnlocked.has(a.id) && a.check(stats));
-          let gems = prev.gems;
-          newlyUnlocked.forEach((a) => {
-            gems += a.reward;
-            alreadyUnlocked.add(a.id);
-          });
-
-          const newLevel = getLevelInfo(xp).level;
-          if (newlyUnlocked.length > 0) {
-            const a = newlyUnlocked[0];
-            showToast(`🏆 Achievement: ${a.name}! +${a.reward} gems${newlyUnlocked.length > 1 ? ` (+${newlyUnlocked.length - 1} more)` : ''}`);
-          } else if (newLevel > prevLevel) {
-            showToast(`🎉 Leveled up to ${newLevel}! New farm slot unlocked`);
-          } else if (newTx.length > 0) {
-            const summary = due.length === 1 ? newTx[0].title : `${due.length} predictions resolved`;
-            showToast(`✓ ${summary}`);
-          }
-          return {
-            ...prev,
-            coins,
-            gems,
-            streak,
-            xp,
-            stats,
-            unlockedAchievements: Array.from(alreadyUnlocked),
-            predictions: nextPredictions.filter((p) => !p.resolved),
-            tx: [...newTx, ...prev.tx].slice(0, 20),
-          };
-        });
       }
     }, 1000);
     return () => clearInterval(id);
@@ -631,78 +433,6 @@ export default function KebunKripto() {
     const elapsed = (now - plot.plantedAt) / 1000;
     const pct = Math.min(100, Math.floor((elapsed / crop.growSec) * 100));
     return { pct, ready: pct >= 100, crop };
-  }
-
-  const [payingPackage, setPayingPackage] = useState(null);
-
-  async function buyWithStars(packageKey) {
-    if (!profile) return;
-    setPayingPackage(packageKey);
-    try {
-      const res = await fetch('/api/create-invoice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid: profile.playerId, packageKey }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.link) {
-        showToast('✗ Could not start payment, try again');
-        setPayingPackage(null);
-        return;
-      }
-      const tg = window.Telegram?.WebApp;
-      if (!tg?.openInvoice) {
-        showToast('✗ Payments only work inside Telegram');
-        setPayingPackage(null);
-        return;
-      }
-      tg.openInvoice(data.link, async (status) => {
-        setPayingPackage(null);
-        if (status === 'paid') {
-          showToast('✓ Payment received! Updating your balance…');
-          const packageCoins = { small: 100, medium: 300, large: 750, jumbo: 2000 };
-          setRewardEffect({ icon: 'coin', amount: packageCoins[packageKey] || 0 });
-          // The webhook is the one that actually credited the coins — pull
-          // the freshly updated state back down instead of trusting the
-          // client to know the new balance.
-          try {
-            const stateRes = await window.storage.get(STORAGE_KEY, false);
-            if (stateRes && stateRes.value) {
-              const parsed = JSON.parse(stateRes.value);
-              setState((s) => ({ ...s, ...parsed }));
-            }
-          } catch (e) {
-            /* next reload will pick it up regardless */
-          }
-          setWalletSheet(null);
-        } else if (status === 'failed') {
-          showToast('✗ Payment failed');
-        } else if (status === 'cancelled') {
-          showToast('Payment cancelled');
-        }
-      });
-    } catch (e) {
-      showToast('✗ Could not start payment, try again');
-      setPayingPackage(null);
-    }
-  }
-
-  const GEM_RATE = 15; // 1 gem = 15 coins
-  function exchangeGems(gemAmount) {
-    if (state.gems < gemAmount) {
-      showToast('✗ Not enough gems');
-      return;
-    }
-    const coinsGained = gemAmount * GEM_RATE;
-    setState((s) => ({
-      ...s,
-      gems: s.gems - gemAmount,
-      coins: s.coins + coinsGained,
-      tx: [{ icon: '✦', title: `Exchange ${gemAmount} gems → coins`, value: `+${coinsGained}`, dir: 'in', time: 'Just now' }, ...s.tx].slice(0, 20),
-    }));
-    setWalletSheet(null);
-    showToast(`✓ ${gemAmount} gems exchanged for ${coinsGained} coins`);
-    setRewardEffect({ icon: 'coin', amount: coinsGained });
   }
 
   function buyDirect(cropId) {
@@ -731,58 +461,144 @@ export default function KebunKripto() {
       ...s,
       [currency]: s[currency] - cost,
       plots: s.plots.map((p) => (p.id === plotId ? { ...p, cropId, plantedAt: Date.now() } : p)),
+      stats: { ...(s.stats || {}), totalPlanted: (s.stats?.totalPlanted || 0) + 1 },
     }));
     setSeedPickerPlot(null);
     showToast(`✓ ${crop.name} planted`);
   }
 
-  function lockPrediction(direction) {
-    if (!sheetPlot || !sheetTimeframe) return;
-    const crop = getCrop(sheetPlot.cropId);
-    const lockedAt = Date.now();
-    const resolveAt = lockedAt + sheetTimeframe.sec * 1000;
-    const activeEvent = getActiveEventForAsset(state.marketEvents, crop.asset, lockedAt);
-    const eventMultiplier = activeEvent ? activeEvent.multiplier : 1.0;
-    const leverage = sheetLeverage || LEVERAGE_OPTIONS[0];
-    const insurance = sheetInsurance || INSURANCE_OPTIONS[0];
-    const stake = Math.round(crop.baseValue * leverage.stakePct);
-    const insuranceCost = Math.round(crop.baseValue * insurance.costPct);
-    const totalCost = stake + insuranceCost;
-    if (totalCost > 0 && state.coins < totalCost) {
-      showToast(`✗ Not enough coins (need ${totalCost} for stake + insurance)`);
-      return;
-    }
-    const effectiveLossMult = Math.min(0.9, leverage.lossMult + insurance.lossBonus);
-    const prediction = {
-      id: `${sheetPlot.id}-${lockedAt}`,
-      plotId: sheetPlot.id,
-      cropId: sheetPlot.cropId,
-      direction,
-      lockedAt,
-      resolveAt,
-      timeframeLabel: sheetTimeframe.label,
-      multiplier: sheetTimeframe.multiplier,
-      eventMultiplier,
-      leverageKey: leverage.key,
-      rewardMult: leverage.rewardMult,
-      lossMult: effectiveLossMult,
-      insuranceKey: insurance.key,
-      stake,
-      insuranceCost,
-      resolved: false,
-    };
+  // Harvesting always pays out — no guess, no risk. Bigger crops just pay more.
+  function harvestPlot(plot) {
+    const crop = getCrop(plot.cropId);
+    const demand = getActiveDemandForAsset(state.demandEvents, crop.asset, now);
+    const demandMult = demand ? demand.multiplier : 1.0;
+    const variance = 0.9 + Math.random() * 0.2; // small +/-10% natural variety
+    const reward = Math.round(crop.baseValue * demandMult * variance);
+    const xpGain = Math.round(8 + crop.baseValue / 20);
+
+    setState((s) => {
+      const stats = { ...(s.stats || { totalHarvests: 0, totalPlanted: 0, totalCoinsEarned: 0, demandWins: 0 }) };
+      stats.totalHarvests = (stats.totalHarvests || 0) + 1;
+      stats.totalCoinsEarned = (stats.totalCoinsEarned || 0) + reward;
+      if (demandMult > 1) stats.demandWins = (stats.demandWins || 0) + 1;
+
+      const prevLevel = getLevelInfo(s.xp || 0).level;
+      const newXp = (s.xp || 0) + xpGain;
+      const newLevel = getLevelInfo(newXp).level;
+
+      const alreadyUnlocked = new Set(s.unlockedAchievements || []);
+      const newlyUnlocked = ACHIEVEMENTS.filter((a) => !alreadyUnlocked.has(a.id) && a.check(stats));
+      let gems = s.gems;
+      newlyUnlocked.forEach((a) => {
+        gems += a.reward;
+        alreadyUnlocked.add(a.id);
+      });
+
+      if (newlyUnlocked.length > 0) {
+        const a = newlyUnlocked[0];
+        showToast(`🏆 Achievement: ${a.name}! +${a.reward} gems${newlyUnlocked.length > 1 ? ` (+${newlyUnlocked.length - 1} more)` : ''}`);
+      } else if (newLevel > prevLevel) {
+        showToast(`🎉 Leveled up to Level ${newLevel}! New farm slot unlocked`);
+      }
+
+      return {
+        ...s,
+        coins: s.coins + reward,
+        gems,
+        xp: newXp,
+        stats,
+        unlockedAchievements: Array.from(alreadyUnlocked),
+        plots: s.plots.map((p) => (p.id === plot.id ? { id: p.id, cropId: null, plantedAt: null } : p)),
+        tx: [
+          {
+            icon: crop.icon,
+            title: `Harvested ${crop.name}${demandMult > 1 ? ` · ⚡×${demandMult.toFixed(1)} demand` : ''}`,
+            value: `+${reward}`,
+            dir: 'in',
+            time: 'Just now',
+          },
+          ...s.tx,
+        ].slice(0, 20),
+      };
+    });
+
+    setRewardEffect({ icon: 'coin', amount: reward });
+  }
+
+  function topUp(amount) {
     setState((s) => ({
       ...s,
-      coins: s.coins - totalCost,
-      predictions: [...s.predictions, prediction],
-      plots: s.plots.map((p) => (p.id === sheetPlot.id ? { id: p.id, cropId: null, plantedAt: null } : p)),
+      coins: s.coins + amount,
+      tx: [{ icon: '💳', title: `Top up ${amount.toLocaleString('en-US')} coins`, value: `+${amount}`, dir: 'in', time: 'Just now' }, ...s.tx].slice(0, 20),
     }));
-    setSheetPlot(null);
-    setSheetTimeframe(null);
-    setSheetLeverage(LEVERAGE_OPTIONS[0]);
-    setSheetInsurance(INSURANCE_OPTIONS[0]);
-    const costNote = totalCost > 0 ? ` · ${totalCost} coins deducted` : '';
-    showToast(activeEvent ? `🔒 Locked · ${sheetTimeframe.label} · 🔥 event bonus ×${eventMultiplier.toFixed(1)}${costNote}` : `🔒 Prediction locked · ${sheetTimeframe.label}${costNote}`);
+    setWalletSheet(null);
+    showToast(`✓ ${amount.toLocaleString('en-US')} coins added`);
+    setRewardEffect({ icon: 'coin', amount });
+  }
+
+  async function buyWithStars(packageKey) {
+    if (!profile) return;
+    setPayingPackage(packageKey);
+    try {
+      const res = await fetch('/api/create-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: profile.playerId, packageKey }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.link) {
+        showToast('✗ Could not start payment, try again');
+        setPayingPackage(null);
+        return;
+      }
+      const tg = window.Telegram?.WebApp;
+      if (!tg?.openInvoice) {
+        showToast('✗ Payments only work inside Telegram');
+        setPayingPackage(null);
+        return;
+      }
+      tg.openInvoice(data.link, async (status) => {
+        setPayingPackage(null);
+        if (status === 'paid') {
+          showToast('✓ Payment received! Updating your balance…');
+          const packageCoins = { small: 100, medium: 300, large: 750, jumbo: 2000 };
+          setRewardEffect({ icon: 'coin', amount: packageCoins[packageKey] || 0 });
+          try {
+            const stateRes = await window.storage.get(STORAGE_KEY, false);
+            if (stateRes && stateRes.value) {
+              const parsed = JSON.parse(stateRes.value);
+              setState((s) => ({ ...s, ...parsed }));
+            }
+          } catch (e) {}
+          setWalletSheet(null);
+        } else if (status === 'failed') {
+          showToast('✗ Payment failed');
+        } else if (status === 'cancelled') {
+          showToast('Payment cancelled');
+        }
+      });
+    } catch (e) {
+      showToast('✗ Could not start payment, try again');
+      setPayingPackage(null);
+    }
+  }
+
+  const GEM_RATE = 15;
+  function exchangeGems(gemAmount) {
+    if (state.gems < gemAmount) {
+      showToast('✗ Not enough gems');
+      return;
+    }
+    const coinsGained = gemAmount * GEM_RATE;
+    setState((s) => ({
+      ...s,
+      gems: s.gems - gemAmount,
+      coins: s.coins + coinsGained,
+      tx: [{ icon: '✦', title: `Exchange ${gemAmount} gems → coins`, value: `+${coinsGained}`, dir: 'in', time: 'Just now' }, ...s.tx].slice(0, 20),
+    }));
+    setWalletSheet(null);
+    showToast(`✓ ${gemAmount} gems exchanged for ${coinsGained} coins`);
+    setRewardEffect({ icon: 'coin', amount: coinsGained });
   }
 
   const screenLabels = { kebun: 'Harvest Season 04', pasar: 'Market Watch', gudang: 'Storage', dompet: 'Balance Summary', papan: 'Leaderboard' };
@@ -820,6 +636,8 @@ export default function KebunKripto() {
           100% { transform: translateX(-50%); }
         }
         .kk-ticker-track { animation: kkTickerScroll 16s linear infinite; }
+        button { outline: none; -webkit-tap-highlight-color: transparent; }
+        button:focus { outline: none; }
         @keyframes kkBurstIconPop {
           0% { transform: scale(0.3); opacity: 0; }
           50% { transform: scale(1.15); opacity: 1; }
@@ -843,8 +661,6 @@ export default function KebunKripto() {
         .kk-burst-icon { animation: kkBurstIconPop 0.5s cubic-bezier(.2,.9,.3,1.4) both, kkBurstFadeOut 1.4s ease both; }
         .kk-burst-particle { animation: kkBurstParticle 0.7s ease-out both; }
         .kk-burst-label { animation: kkBurstLabelRise 1.3s ease both; }
-        button { outline: none; -webkit-tap-highlight-color: transparent; }
-        button:focus { outline: none; }
       `}</style>
       <div style={styles.device}>
         <div style={styles.topbar}>
@@ -858,7 +674,7 @@ export default function KebunKripto() {
               </div>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <div style={{ ...styles.pill, color: '#E8C468' }}>
               <span style={{ ...styles.dot, background: 'rgba(232,196,104,0.15)' }}><Icon src={ICON_COIN} size={11} /></span>
               {animatedCoins.toLocaleString('en-US')}
@@ -871,22 +687,18 @@ export default function KebunKripto() {
           </div>
         </div>
 
-        {screen === 'kebun' && <Ticker now={now} marketEvents={state.marketEvents} />}
+        {screen === 'kebun' && <Ticker now={now} demandEvents={state.demandEvents} />}
 
-        {screen === 'kebun' && (
-          <LevelBar levelInfo={getLevelInfo(state.xp || 0)} />
-        )}
+        {screen === 'kebun' && <LevelBar levelInfo={getLevelInfo(state.xp || 0)} />}
 
         {screen === 'kebun' && (
           <FarmScreen
             plots={state.plots}
-            predictions={state.predictions}
             now={now}
-            streak={state.streak || 0}
             unlockedPlots={getLevelInfo(state.xp || 0).plots}
             plotProgress={plotProgress}
             onEmptyClick={(plotId) => setSeedPickerPlot(plotId)}
-            onReadyClick={(plot) => { setSheetPlot(plot); setSheetLeverage(LEVERAGE_OPTIONS[0]); setSheetInsurance(INSURANCE_OPTIONS[0]); }}
+            onHarvest={harvestPlot}
           />
         )}
         {screen === 'pasar' && <MarketScreen now={now} onBuy={(cropId) => setSeedPickerPlot('any-' + cropId)} onBuyDirect={buyDirect} />}
@@ -933,29 +745,6 @@ export default function KebunKripto() {
         />
       )}
 
-      {sheetPlot && (
-        <PredictSheet
-          crop={getCrop(sheetPlot.cropId)}
-          now={now}
-          timeframe={sheetTimeframe}
-          leverage={sheetLeverage}
-          onPickLeverage={setSheetLeverage}
-          insurance={sheetInsurance}
-          onPickInsurance={setSheetInsurance}
-          coins={state.coins}
-          streak={state.streak || 0}
-          activeEvent={getActiveEventForAsset(state.marketEvents, getCrop(sheetPlot.cropId).asset, now)}
-          onPickTimeframe={setSheetTimeframe}
-          onLock={lockPrediction}
-          onClose={() => {
-            setSheetPlot(null);
-            setSheetTimeframe(null);
-            setSheetLeverage(LEVERAGE_OPTIONS[0]);
-            setSheetInsurance(INSURANCE_OPTIONS[0]);
-          }}
-        />
-      )}
-
       {walletSheet === 'topup' && <TopUpSheet onPick={buyWithStars} payingPackage={payingPackage} onClose={() => setWalletSheet(null)} />}
       {walletSheet === 'exchange' && <ExchangeSheet gems={state.gems} rate={GEM_RATE} onPick={exchangeGems} onClose={() => setWalletSheet(null)} />}
 
@@ -968,16 +757,23 @@ export default function KebunKripto() {
   );
 }
 
+function genPlayerId() {
+  return 'p' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
+}
+function genNickname(id) {
+  return 'Farmer#' + id.slice(-4).toUpperCase();
+}
+
 /* ---------------- Sub components ---------------- */
 
-const TICKER_TIMEFRAMES = [
+const MARKET_TIMEFRAMES = [
   { key: '1m', label: '1M', sec: 60 },
   { key: '5m', label: '5M', sec: 300 },
   { key: '15m', label: '15M', sec: 900 },
 ];
 
-function Ticker({ now, marketEvents }) {
-  const [tf, setTf] = useState(TICKER_TIMEFRAMES[0]);
+function Ticker({ now, demandEvents }) {
+  const [tf, setTf] = useState(MARKET_TIMEFRAMES[0]);
   const assets = [
     { asset: 'btc', name: 'BTC-tier' },
     { asset: 'eth', name: 'ETH-tier' },
@@ -987,25 +783,17 @@ function Ticker({ now, marketEvents }) {
     { asset: 'avax', name: 'AVAX-tier' },
   ];
   const items = assets.map((a) => {
-    const prev = priceIndexAt(a.asset, now - tf.sec * 1000);
-    const curr = priceIndexAt(a.asset, now);
+    const prev = moodIndexAt(a.asset, now - tf.sec * 1000);
+    const curr = moodIndexAt(a.asset, now);
     const pct = ((curr - prev) / Math.max(0.05, Math.abs(prev))) * 100;
-    const price = getDisplayPrice(a.asset, now);
-    const event = getActiveEventForAsset(marketEvents, a.asset, now);
-    return { ...a, pct, price, up: pct >= 0, event };
+    const event = getActiveDemandForAsset(demandEvents, a.asset, now);
+    return { ...a, pct, up: pct >= 0, event };
   });
   return (
     <div style={styles.ticker}>
       <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-        {TICKER_TIMEFRAMES.map((t) => (
-          <div
-            key={t.key}
-            onClick={() => setTf(t)}
-            style={{
-              ...styles.tickerTfBtn,
-              ...(tf.key === t.key ? styles.tickerTfBtnActive : {}),
-            }}
-          >
+        {MARKET_TIMEFRAMES.map((t) => (
+          <div key={t.key} onClick={() => setTf(t)} style={{ ...styles.tickerTfBtn, ...(tf.key === t.key ? styles.tickerTfBtnActive : {}) }}>
             {t.label}
           </div>
         ))}
@@ -1014,7 +802,7 @@ function Ticker({ now, marketEvents }) {
         <div className="kk-ticker-track" style={{ display: 'flex', gap: 22, fontFamily: "'IBM Plex Mono', monospace", fontSize: 11.5, whiteSpace: 'nowrap', width: 'max-content' }}>
           {[...items, ...items].map((t, i) => (
             <span key={i} style={{ color: t.event ? '#E8C468' : (t.up ? '#4AFFB0' : '#FF6B5C'), fontWeight: t.event ? 700 : 600 }}>
-              {t.event && <Icon src={ICON_LIGHTNING} size={11} style={{ marginRight: 3 }} />}{t.name} ${fmtPrice(t.price)} {t.up ? '+' : ''}{t.pct.toFixed(1)}%
+              {t.event && <Icon src={ICON_LIGHTNING} size={11} style={{ marginRight: 3 }} />}{t.name} {t.up ? '+' : ''}{t.pct.toFixed(1)}%
             </span>
           ))}
         </div>
@@ -1046,23 +834,10 @@ function LevelBar({ levelInfo }) {
   );
 }
 
-function FarmScreen({ plots, predictions, now, streak, unlockedPlots, plotProgress, onEmptyClick, onReadyClick }) {
+function FarmScreen({ plots, now, unlockedPlots, plotProgress, onEmptyClick, onHarvest }) {
   const filled = plots.filter((p) => p.cropId).length;
-  const streakBonusPct = Math.min(Math.max(streak - 1, 0), STREAK_BONUS_CAP) * STREAK_BONUS_PER_LEVEL;
   return (
     <>
-      {streak > 0 && (
-        <div style={styles.streakBar}>
-          <div style={{ fontSize: 18 }}>🔥</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 700 }}>{streak}-guess winning streak</div>
-            <div style={{ fontSize: 10, color: '#8FA69C', marginTop: 1 }}>
-              Current reward bonus: <span style={{ color: '#4AFFB0', fontFamily: "'IBM Plex Mono', monospace" }}>+{Math.round(streakBonusPct * 100)}%</span>
-              {streak <= STREAK_BONUS_CAP ? ' · one miss resets it to 0' : ' · already maxed out'}
-            </div>
-          </div>
-        </div>
-      )}
       <div style={styles.sectionHead}>
         <div style={styles.sectionTitle}>Your Farm</div>
         <div style={styles.sectionMeta}>{filled} / {unlockedPlots} plots</div>
@@ -1095,7 +870,7 @@ function FarmScreen({ plots, predictions, now, streak, unlockedPlots, plotProgre
               key={plot.id}
               className={prog.ready ? 'kk-ready-plot' : ''}
               style={{ ...styles.plot, ...(prog.ready ? styles.plotReady : {}) }}
-              onClick={() => prog.ready && onReadyClick(plot)}
+              onClick={() => prog.ready && onHarvest(plot)}
             >
               <Sparkline assetId={prog.crop.asset} now={now} />
               <div
@@ -1117,49 +892,9 @@ function FarmScreen({ plots, predictions, now, streak, unlockedPlots, plotProgre
           );
         })}
       </div>
-
-      <div style={styles.sectionHead}>
-        <div style={styles.sectionTitle}>Active Predictions</div>
-        <div style={styles.sectionMeta}>{predictions.length} locked</div>
-      </div>
-      <div style={{ padding: '0 18px 24px', position: 'relative', zIndex: 2 }}>
-        {predictions.length === 0 ? (
-          <div style={{ ...styles.card, textAlign: 'center', color: '#5C7268', fontSize: 12.5, padding: '20px 16px' }}>
-            No locked predictions yet. Harvest a plant, then pick a timeframe to lock in a prediction.
-          </div>
-        ) : (
-          <div style={styles.card}>
-            {predictions.map((p, i) => {
-              const crop = getCrop(p.cropId);
-              const remaining = p.resolveAt - now;
-              return (
-                <div key={p.id} style={{ ...styles.listRow, borderTop: i > 0 ? '1px solid #223530' : 'none' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={styles.rowIcon}>{crop.icon}</div>
-                    <div>
-                      <div style={styles.rowTitle}>{crop.name}</div>
-                      <div style={styles.rowSub}>
-                        {p.direction === 'up' ? '↑ Up' : '↓ Down'} · {p.timeframeLabel}
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, color: '#E8C468' }}>{fmtCountdown(remaining)}</div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
     </>
   );
 }
-
-const MARKET_TIMEFRAMES = [
-  { key: '1m', label: '1M', sec: 60 },
-  { key: '3m', label: '3M', sec: 180 },
-  { key: '5m', label: '5M', sec: 300 },
-  { key: '15m', label: '15M', sec: 900 },
-];
 
 function MarketScreen({ now, onBuy, onBuyDirect }) {
   const [tf, setTf] = useState(MARKET_TIMEFRAMES[0]);
@@ -1177,7 +912,7 @@ function MarketScreen({ now, onBuy, onBuyDirect }) {
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 14 }}>{seasonalCrop.name}</div>
             <div style={{ fontSize: 10.5, color: '#E8C468', marginTop: 2 }}>
-              {seasonalCrop.tier} · correct {seasonalCrop.baseValue} coins (1m base) · {fmtGrowDuration(seasonalCrop.growSec)} grow
+              {seasonalCrop.tier} · harvest ~{seasonalCrop.baseValue} coins · {fmtGrowDuration(seasonalCrop.growSec)} grow
             </div>
             <div style={{ fontSize: 9.5, color: '#8FA69C', marginTop: 2 }}>Only available today — a different seed rotates in tomorrow</div>
           </div>
@@ -1186,25 +921,21 @@ function MarketScreen({ now, onBuy, onBuyDirect }) {
       </div>
 
       <div style={styles.sectionHead}>
-        <div style={styles.sectionTitle}>Today's Market</div>
+        <div style={styles.sectionTitle}>Market Mood</div>
         <div style={styles.sectionMeta}>live</div>
       </div>
       <div style={{ padding: '0 18px 10px', position: 'relative', zIndex: 2 }}>
         <div style={{ display: 'flex', gap: 7, marginBottom: 10 }}>
           {MARKET_TIMEFRAMES.map((t) => (
-            <div
-              key={t.key}
-              onClick={() => setTf(t)}
-              style={{ ...styles.tfBtn, flex: 1, padding: '7px 0', fontSize: 11, textAlign: 'center', ...(tf.key === t.key ? styles.tfBtnActive : {}) }}
-            >
+            <div key={t.key} onClick={() => setTf(t)} style={{ ...styles.tfBtn, flex: 1, padding: '7px 0', fontSize: 11, textAlign: 'center', ...(tf.key === t.key ? styles.tfBtnActive : {}) }}>
               {t.label}
             </div>
           ))}
         </div>
         <div style={styles.card}>
           {cropList.map((c, i) => {
-            const prev = priceIndexAt(c.asset, now - tf.sec * 1000);
-            const curr = priceIndexAt(c.asset, now);
+            const prev = moodIndexAt(c.asset, now - tf.sec * 1000);
+            const curr = moodIndexAt(c.asset, now);
             const up = curr >= prev;
             const pct = ((curr - prev) / Math.max(0.05, Math.abs(prev))) * 100;
             return (
@@ -1220,19 +951,17 @@ function MarketScreen({ now, onBuy, onBuyDirect }) {
                   <Sparkline assetId={c.asset} now={now} windowSec={tf.sec} opacity={1} />
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 12.5, color: '#EAF3EE' }}>
-                    ${fmtPrice(getDisplayPrice(c.asset, now))}
-                  </div>
-                  <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: up ? '#4AFFB0' : '#FF6B5C', marginTop: 1 }}>
+                  <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: up ? '#4AFFB0' : '#FF6B5C' }}>
                     {up ? '+' : ''}{pct.toFixed(1)}%
                   </div>
-                  <div style={{ fontSize: 9, color: '#5C7268', marginTop: 1 }}>{tf.label.toLowerCase()}</div>
+                  <div style={{ fontSize: 9, color: '#5C7268', marginTop: 1 }}>mood, {tf.label.toLowerCase()}</div>
                 </div>
               </div>
             );
           })}
         </div>
       </div>
+
       <div style={styles.sectionHead}>
         <div style={styles.sectionTitle}>Available Seeds</div>
         <div style={styles.sectionMeta}>{cropList.length} varieties</div>
@@ -1243,7 +972,10 @@ function MarketScreen({ now, onBuy, onBuyDirect }) {
             <div key={c.id} style={{ ...styles.listRow, borderTop: i > 0 ? '1px solid #223530' : 'none' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={styles.rowIcon}>{c.icon}</div>
-                <div style={styles.rowTitle}>{c.name} Seed</div>
+                <div>
+                  <div style={styles.rowTitle}>{c.name}</div>
+                  <div style={styles.rowSub}>{fmtGrowDuration(c.growSec)} grow · ~{c.baseValue} coins/harvest</div>
+                </div>
               </div>
               <button style={styles.btnGhost} onClick={() => onBuy(c.id)}>
                 {c.seedCost} {c.seedCurrency === 'coins' ? 'coins' : 'gems'}
@@ -1257,7 +989,7 @@ function MarketScreen({ now, onBuy, onBuyDirect }) {
 }
 
 function WarehouseScreen({ tx, unlockedAchievements }) {
-  const harvestTx = tx.filter((t) => t.title.includes('·'));
+  const harvestTx = tx.filter((t) => t.title.startsWith('Harvested') || t.title.startsWith('Daily') || t.title.startsWith('Claimed'));
   const unlockedSet = new Set(unlockedAchievements || []);
   const unlockedCount = ACHIEVEMENTS.filter((a) => unlockedSet.has(a.id)).length;
   return (
@@ -1297,7 +1029,7 @@ function WarehouseScreen({ tx, unlockedAchievements }) {
       <div style={{ padding: '0 18px 24px', position: 'relative', zIndex: 2 }}>
         {harvestTx.length === 0 ? (
           <div style={{ ...styles.card, textAlign: 'center', color: '#5C7268', fontSize: 12.5, padding: '28px 16px' }}>
-            No results yet. Lock in and win predictions to fill your storage.
+            No results yet. Plant and harvest a crop to fill your storage.
           </div>
         ) : (
           <div style={styles.card}>
@@ -1320,8 +1052,50 @@ function WarehouseScreen({ tx, unlockedAchievements }) {
   );
 }
 
+function WalletScreen({ coins, gems, tx, onTopUp, onExchange }) {
+  return (
+    <>
+      <div style={styles.balanceHero}>
+        <div style={{ fontSize: 11, color: '#8FA69C', letterSpacing: '0.03em', position: 'relative', zIndex: 2 }}>Total Balance</div>
+        <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 34, marginTop: 6, position: 'relative', zIndex: 2 }}>
+          {coins.toLocaleString('en-US')} <span style={{ fontSize: 16, color: '#8FA69C', fontWeight: 500 }}>coins</span>
+        </div>
+        <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11.5, color: '#4AFFB0', marginTop: 4, position: 'relative', zIndex: 2 }}>{gems} gems available</div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 18, position: 'relative', zIndex: 2 }}>
+          <button style={{ ...styles.btnMint, flex: 1 }} onClick={onTopUp}>Top Up</button>
+          <button style={{ ...styles.btnGhost, flex: 1 }} onClick={onExchange}>Exchange Gems</button>
+        </div>
+      </div>
+      <div style={styles.sectionHead}>
+        <div style={styles.sectionTitle}>History</div>
+        <div style={styles.sectionMeta}>{tx.length} transactions</div>
+      </div>
+      <div style={{ padding: '0 18px 24px', position: 'relative', zIndex: 2 }}>
+        {tx.length === 0 ? (
+          <div style={{ ...styles.card, textAlign: 'center', color: '#5C7268', fontSize: 12.5, padding: '28px 16px' }}>No transactions yet.</div>
+        ) : (
+          <div style={styles.card}>
+            {tx.map((t, i) => (
+              <div key={i} style={{ ...styles.listRow, borderTop: i > 0 ? '1px solid #223530' : 'none' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ ...styles.rowIcon, background: t.dir === 'in' ? 'rgba(74,255,176,0.12)' : 'rgba(255,107,92,0.12)' }}>{t.icon}</div>
+                  <div>
+                    <div style={styles.rowTitle}>{t.title}</div>
+                    <div style={styles.rowSub}>{t.time}</div>
+                  </div>
+                </div>
+                <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, color: t.dir === 'in' ? '#4AFFB0' : '#FF6B5C' }}>{t.value}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
 function LeaderboardScreen({ profile, onClaim, showToast }) {
-  const [rows, setRows] = useState(null); // null = loading
+  const [rows, setRows] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [codeInput, setCodeInput] = useState('');
   const [copied, setCopied] = useState(false);
@@ -1401,18 +1175,8 @@ function LeaderboardScreen({ profile, onClaim, showToast }) {
           <div style={{ height: 1, background: '#223530', margin: '14px 0' }} />
           <div style={{ fontSize: 11, color: '#8FA69C', marginBottom: 8 }}>Got a code from a friend? Claim it here (+30 gems, one-time use per code):</div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              value={codeInput}
-              onChange={(e) => setCodeInput(e.target.value)}
-              placeholder="Enter a friend's code"
-              style={styles.codeInput}
-            />
-            <button
-              onClick={() => { onClaim(codeInput); setCodeInput(''); }}
-              style={styles.btnMint}
-            >
-              Claim
-            </button>
+            <input value={codeInput} onChange={(e) => setCodeInput(e.target.value)} placeholder="Enter a friend's code" style={styles.codeInput} />
+            <button onClick={() => { onClaim(codeInput); setCodeInput(''); }} style={styles.btnMint}>Claim</button>
           </div>
         </div>
       </div>
@@ -1453,172 +1217,6 @@ function LeaderboardScreen({ profile, onClaim, showToast }) {
   );
 }
 
-const TUTORIAL_STEPS = [
-  {
-    emoji: '🌱',
-    title: 'Welcome to Crypto Farm',
-    body: 'Plant crypto-themed crops, let them grow, then predict which way a simulated market price will move. Guess right, take the reward. Guess wrong, only lose a little.',
-  },
-  {
-    emoji: '🌾',
-    title: '1. Plant a seed',
-    body: 'Go to the Market tab, buy a seed with coins. It grows on its own over time — even while the app is closed, so check back later.',
-  },
-  {
-    emoji: '🎯',
-    title: '2. Harvest & predict',
-    body: "When a plot shows PANEN, tap it. Pick a timeframe (1–15 minutes), then guess Up or Down for where the price lands when that timeframe's candle closes.",
-  },
-  {
-    emoji: '🎲',
-    title: '3. Leverage & Insurance (optional)',
-    body: 'Stake extra upfront for a bigger reward if you\u2019re right (Leverage), or pay a small premium to soften the loss if you\u2019re wrong (Insurance). Both are optional — 1× with no insurance is always free.',
-  },
-  {
-    emoji: '🔥',
-    title: 'Streaks & Volatile events',
-    body: 'Win predictions back-to-back to build a streak bonus — one miss resets it. Watch the ticker for ⚡ Volatile events too: locking in a prediction on that asset while it\u2019s active pays extra.',
-  },
-  {
-    emoji: '⭐',
-    title: 'Level up & achievements',
-    body: 'Every prediction earns XP — leveling up unlocks more farm plots (up to 9). Achievements hand out bonus gems. Check the Board tab for the leaderboard and your referral code.',
-  },
-];
-
-function RewardBurst({ effect, onDone }) {
-  useEffect(() => {
-    const t = setTimeout(onDone, 1400);
-    return () => clearTimeout(t);
-  }, [onDone]);
-
-  const icon = effect.icon === 'gem' ? ICON_GEM : ICON_COIN;
-  const particles = Array.from({ length: 10 }, (_, i) => i);
-
-  return (
-    <div style={styles.burstBackdrop}>
-      <div style={{ position: 'relative', width: 160, height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {particles.map((i) => {
-          const angle = (360 / particles.length) * i;
-          return (
-            <div
-              key={i}
-              className="kk-burst-particle"
-              style={{
-                position: 'absolute',
-                width: 6,
-                height: 6,
-                borderRadius: '50%',
-                background: effect.icon === 'gem' ? '#4AFFB0' : '#E8C468',
-                '--angle': `${angle}deg`,
-                animationDelay: `${i * 0.02}s`,
-              }}
-            />
-          );
-        })}
-        <div className="kk-burst-icon" style={{ position: 'relative', zIndex: 2 }}>
-          <img src={icon} alt="" style={{ width: 88, height: 88, objectFit: 'contain', filter: `drop-shadow(0 0 24px ${effect.icon === 'gem' ? 'rgba(74,255,176,0.6)' : 'rgba(232,196,104,0.6)'})` }} />
-        </div>
-        {effect.amount > 0 && (
-          <div className="kk-burst-label" style={styles.burstLabel}>
-            +{effect.amount.toLocaleString('en-US')}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function TutorialModal({ onClose }) {
-  const [step, setStep] = useState(0);
-  const isLast = step === TUTORIAL_STEPS.length - 1;
-  const current = TUTORIAL_STEPS[step];
-
-  return (
-    <div style={styles.sheetBackdrop}>
-      <div style={{ ...styles.sheet, paddingBottom: 24 }}>
-        <div style={styles.sheetHandle} />
-        <div style={{ textAlign: 'center', padding: '8px 8px 4px' }}>
-          <div style={{ fontSize: 46, marginBottom: 10 }}>{current.emoji}</div>
-          <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 18, marginBottom: 10 }}>{current.title}</div>
-          <div style={{ fontSize: 13, color: '#8FA69C', lineHeight: 1.6, padding: '0 4px' }}>{current.body}</div>
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, margin: '20px 0' }}>
-          {TUTORIAL_STEPS.map((_, i) => (
-            <div key={i} style={{ width: i === step ? 18 : 6, height: 6, borderRadius: 100, background: i === step ? '#4AFFB0' : '#223530', transition: 'all 0.2s ease' }} />
-          ))}
-        </div>
-
-        <div style={{ display: 'flex', gap: 10 }}>
-          {step > 0 && (
-            <button onClick={() => setStep((s) => s - 1)} style={{ ...styles.btnGhost, flex: 1 }}>
-              Back
-            </button>
-          )}
-          <button
-            onClick={() => (isLast ? onClose() : setStep((s) => s + 1))}
-            style={{ ...styles.btnMint, flex: step > 0 ? 1 : undefined, width: step > 0 ? undefined : '100%', padding: '11px 0' }}
-          >
-            {isLast ? "Let's play!" : 'Next'}
-          </button>
-        </div>
-        {!isLast && (
-          <div style={{ textAlign: 'center', marginTop: 12 }}>
-            <span onClick={onClose} style={{ fontSize: 11.5, color: '#5C7268', cursor: 'pointer', textDecoration: 'underline' }}>
-              Skip
-            </span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function WalletScreen({ coins, gems, tx, onTopUp, onExchange }) {
-  return (
-    <>
-      <div style={styles.balanceHero}>
-        <div style={{ fontSize: 11, color: '#8FA69C', letterSpacing: '0.03em', position: 'relative', zIndex: 2 }}>Total Balance</div>
-        <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 34, marginTop: 6, position: 'relative', zIndex: 2 }}>
-          {coins.toLocaleString('en-US')} <span style={{ fontSize: 16, color: '#8FA69C', fontWeight: 500 }}>coins</span>
-        </div>
-        <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11.5, color: '#4AFFB0', marginTop: 4, position: 'relative', zIndex: 2 }}>{gems} gems available</div>
-        <div style={{ display: 'flex', gap: 10, marginTop: 18, position: 'relative', zIndex: 2 }}>
-          <button style={{ ...styles.btnMint, flex: 1 }} onClick={onTopUp}>Top Up</button>
-          <button style={{ ...styles.btnGhost, flex: 1 }} onClick={onExchange}>Exchange Gems</button>
-        </div>
-      </div>
-      <div style={styles.sectionHead}>
-        <div style={styles.sectionTitle}>History</div>
-        <div style={styles.sectionMeta}>{tx.length} transactions</div>
-      </div>
-      <div style={{ padding: '0 18px 24px', position: 'relative', zIndex: 2 }}>
-        {tx.length === 0 ? (
-          <div style={{ ...styles.card, textAlign: 'center', color: '#5C7268', fontSize: 12.5, padding: '28px 16px' }}>
-            No transactions yet.
-          </div>
-        ) : (
-          <div style={styles.card}>
-            {tx.map((t, i) => (
-              <div key={i} style={{ ...styles.listRow, borderTop: i > 0 ? '1px solid #223530' : 'none' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ ...styles.rowIcon, background: t.dir === 'in' ? 'rgba(74,255,176,0.12)' : 'rgba(255,107,92,0.12)' }}>{t.icon}</div>
-                  <div>
-                    <div style={styles.rowTitle}>{t.title}</div>
-                    <div style={styles.rowSub}>{t.time}</div>
-                  </div>
-                </div>
-                <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 13, color: t.dir === 'in' ? '#4AFFB0' : '#FF6B5C' }}>{t.value}</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </>
-  );
-}
-
 function SeedPickerSheet({ coins, gems, onPick, onClose }) {
   const cropList = Object.values(CROPS);
   return (
@@ -1631,7 +1229,7 @@ function SeedPickerSheet({ coins, gems, onPick, onClose }) {
             <button onClick={onClose} style={styles.closeBtn}>✕</button>
           </div>
           <div style={{ fontSize: 9.5, color: '#5C7268', marginBottom: 10, lineHeight: 1.4 }}>
-            The numbers on each seed show the correct/wrong reward per timeframe. Longer timeframe = bigger reward.
+            Every harvest pays out — bigger, pricier crops just pay more (and take longer to grow).
           </div>
         </div>
         <div style={{ overflowY: 'auto', padding: '0 20px 12px' }}>
@@ -1639,170 +1237,24 @@ function SeedPickerSheet({ coins, gems, onPick, onClose }) {
             const balance = c.seedCurrency === 'coins' ? coins : gems;
             const affordable = balance >= c.seedCost;
             return (
-              <div key={c.id} style={{ ...styles.seedRowCol, borderTop: i > 0 ? '1px solid #1B2823' : 'none', opacity: affordable ? 1 : 0.4 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                    <div style={styles.rowIconSm}>{c.icon}</div>
-                    <div>
-                      <div style={{ fontSize: 12.5, fontWeight: 600 }}>{c.name}</div>
-                      <div style={{ fontSize: 9.5, color: '#5C7268', fontFamily: "'IBM Plex Mono', monospace", marginTop: 1 }}>{fmtGrowDuration(c.growSec)} grow</div>
+              <div key={c.id} style={{ ...styles.seedRow, borderTop: i > 0 ? '1px solid #1B2823' : 'none', opacity: affordable ? 1 : 0.4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                  <div style={styles.rowIconSm}>{c.icon}</div>
+                  <div>
+                    <div style={{ fontSize: 12.5, fontWeight: 600 }}>{c.name}</div>
+                    <div style={{ fontSize: 9.5, color: '#5C7268', fontFamily: "'IBM Plex Mono', monospace", marginTop: 1 }}>{fmtGrowDuration(c.growSec)} grow</div>
+                    <div style={{ fontSize: 9.5, color: '#8FA69C', marginTop: 2 }}>
+                      ~<span style={{ color: '#4AFFB0', fontFamily: "'IBM Plex Mono', monospace" }}>{c.baseValue}</span> coins per harvest
                     </div>
                   </div>
-                  <button style={{ ...styles.btnGhostSm, opacity: affordable ? 1 : 0.5, cursor: affordable ? 'pointer' : 'not-allowed' }} onClick={() => affordable && onPick(c.id)} disabled={!affordable}>
-                    {c.seedCost} {c.seedCurrency === 'coins' ? 'coins' : 'gems'}
-                  </button>
                 </div>
-                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                  {TIMEFRAMES.map((tf) => (
-                    <div key={tf.key} style={{ flex: 1, textAlign: 'center', background: '#182B25', borderRadius: 8, padding: '4px 2px' }}>
-                      <div style={{ fontSize: 8, color: '#5C7268', fontFamily: "'IBM Plex Mono', monospace" }}>{tf.label.replace(/ Minutes?/, 'm')}</div>
-                      <div style={{ fontSize: 10, color: '#4AFFB0', fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600 }}>{Math.round(c.baseValue * tf.multiplier)}</div>
-                      <div style={{ fontSize: 8, color: '#E8C468', fontFamily: "'IBM Plex Mono', monospace" }}>/{Math.round(c.baseValue * tf.multiplier * 0.1)}</div>
-                    </div>
-                  ))}
-                </div>
+                <button style={{ ...styles.btnGhostSm, opacity: affordable ? 1 : 0.5, cursor: affordable ? 'pointer' : 'not-allowed' }} onClick={() => affordable && onPick(c.id)} disabled={!affordable}>
+                  {c.seedCost} {c.seedCurrency === 'coins' ? 'coins' : 'gems'}
+                </button>
               </div>
             );
           })}
         </div>
-      </div>
-    </div>
-  );
-}
-
-function PredictSheet({ crop, now, timeframe, leverage, onPickLeverage, insurance, onPickInsurance, coins, streak, activeEvent, onPickTimeframe, onLock, onClose }) {
-  const nextStreakBonusPct = Math.min(streak, STREAK_BONUS_CAP) * STREAK_BONUS_PER_LEVEL;
-  const eventMult = activeEvent ? activeEvent.multiplier : 1.0;
-  const lev = leverage || LEVERAGE_OPTIONS[0];
-  const ins = insurance || INSURANCE_OPTIONS[0];
-  const stake = Math.round(crop.baseValue * lev.stakePct);
-  const insuranceCost = Math.round(crop.baseValue * ins.costPct);
-  const totalCost = stake + insuranceCost;
-  const canAffordStake = coins >= totalCost;
-  const effectiveLossMult = Math.min(0.9, lev.lossMult + ins.lossBonus);
-  return (
-    <div style={styles.sheetBackdrop} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div style={styles.sheet}>
-        <div style={styles.sheetHandle} />
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 6 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 46, height: 46, borderRadius: 12, background: '#182B25', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>{crop.icon}</div>
-            <div>
-              <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 17 }}>{crop.name}</div>
-              <div style={{ fontSize: 11.5, color: '#8FA69C', marginTop: 1 }}>{crop.tier} · base reward {crop.baseValue} coins</div>
-            </div>
-          </div>
-          <button onClick={onClose} style={styles.closeBtn}>✕</button>
-        </div>
-
-        {activeEvent && (
-          <div style={{ ...styles.eventBadge, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <Icon src={ICON_LIGHTNING} size={14} />
-            <span>Volatile right now — reward ×{eventMult.toFixed(1)} if locked in now ({fmtCountdown(activeEvent.endAt - now)} left)</span>
-          </div>
-        )}
-
-        <div style={{ position: 'relative', height: 70, margin: '14px 0 4px', background: '#182B25', borderRadius: 12, overflow: 'hidden' }}>
-          <Sparkline assetId={crop.asset} now={now} windowSec={120} opacity={0.9} strokeWidth={2} />
-        </div>
-
-        <div style={{ fontSize: 12, color: '#5C7268', margin: '10px 0 14px' }}>1. Pick the candle timeframe your guess is based on:</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 7, marginBottom: timeframe ? 16 : 4 }}>
-          {TIMEFRAMES.map((tf) => (
-            <div
-              key={tf.key}
-              onClick={() => onPickTimeframe(tf)}
-              style={{
-                ...styles.tfBtn,
-                textAlign: 'center',
-                ...(timeframe?.key === tf.key ? styles.tfBtnActive : {}),
-              }}
-            >
-              <div>{tf.label}</div>
-              <div style={{ fontSize: 9.5, opacity: 0.75, marginTop: 2 }}>×{tf.multiplier.toFixed(1)}</div>
-            </div>
-          ))}
-        </div>
-
-        {timeframe && (
-          <>
-            <div style={{ fontSize: 12, color: '#5C7268', margin: '10px 0' }}>2. Pick leverage (optional — bigger stake = bigger reward):</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 7, marginBottom: 16 }}>
-              {LEVERAGE_OPTIONS.map((lv) => {
-                const lvStake = Math.round(crop.baseValue * lv.stakePct);
-                const affordable = coins >= lvStake;
-                return (
-                  <div
-                    key={lv.key}
-                    onClick={() => affordable && onPickLeverage(lv)}
-                    style={{
-                      ...styles.tfBtn,
-                      textAlign: 'center',
-                      opacity: affordable ? 1 : 0.4,
-                      cursor: affordable ? 'pointer' : 'not-allowed',
-                      ...(lev.key === lv.key ? styles.tfBtnActive : {}),
-                    }}
-                  >
-                    <div>{lv.label}</div>
-                    <div style={{ fontSize: 8.5, opacity: 0.75, marginTop: 2 }}>{lvStake > 0 ? `stake ${lvStake}` : 'free'}</div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div style={{ fontSize: 12, color: '#5C7268', margin: '10px 0' }}>3. Insurance (optional — softens a wrong guess):</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 7, marginBottom: 16 }}>
-              {INSURANCE_OPTIONS.map((iv) => {
-                const ivCost = Math.round(crop.baseValue * iv.costPct);
-                const affordable = coins >= (stake + ivCost);
-                return (
-                  <div
-                    key={iv.key}
-                    onClick={() => affordable && onPickInsurance(iv)}
-                    style={{
-                      ...styles.tfBtn,
-                      textAlign: 'center',
-                      opacity: affordable ? 1 : 0.4,
-                      cursor: affordable ? 'pointer' : 'not-allowed',
-                      ...(ins.key === iv.key ? styles.tfBtnActive : {}),
-                    }}
-                  >
-                    <div style={{ fontSize: 10.5 }}>{iv.label}</div>
-                    <div style={{ fontSize: 8.5, opacity: 0.75, marginTop: 2 }}>{ivCost > 0 ? `premium ${ivCost}` : 'free'}</div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div style={{ fontSize: 12, color: '#5C7268', marginBottom: 10 }}>
-              4. Guess the price direction when this {timeframe.label} candle closes:
-            </div>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button style={{ ...styles.predictBtn, opacity: canAffordStake ? 1 : 0.5 }} onClick={() => canAffordStake && onLock('up')}>
-                <span style={{ fontSize: 19, color: '#4AFFB0' }}>↑</span>
-                Up
-              </button>
-              <button style={{ ...styles.predictBtn, opacity: canAffordStake ? 1 : 0.5 }} onClick={() => canAffordStake && onLock('down')}>
-                <span style={{ fontSize: 19, color: '#FF6B5C' }}>↓</span>
-                Down
-              </button>
-            </div>
-            <div style={{ textAlign: 'center', fontSize: 10.5, color: '#5C7268', marginTop: 14 }}>
-              Locked {timeframe.label} · correct ={' '}
-              <span style={{ color: '#4AFFB0', fontFamily: "'IBM Plex Mono', monospace" }}>{Math.round(crop.baseValue * timeframe.multiplier * eventMult * (1 + nextStreakBonusPct) * lev.rewardMult)} coins</span>
-              {' '}· wrong ={' '}
-              <span style={{ color: '#E8C468', fontFamily: "'IBM Plex Mono', monospace" }}>{Math.round(crop.baseValue * timeframe.multiplier * eventMult * effectiveLossMult)} coins</span>
-              {totalCost > 0 && (
-                <div style={{ marginTop: 4, color: '#FF6B5C' }}>
-                  🎲 {totalCost} coins deducted upfront ({stake > 0 ? `stake ${stake}` : ''}{stake > 0 && insuranceCost > 0 ? ' + ' : ''}{insuranceCost > 0 ? `premium ${insuranceCost}` : ''}){!canAffordStake ? ' — not enough coins' : ''}
-                </div>
-              )}
-              {streak > 0 && (
-                <div style={{ marginTop: 4, color: '#E8C468' }}>🔥 Already includes streak bonus +{Math.round(nextStreakBonusPct * 100)}%</div>
-              )}
-            </div>
-          </>
-        )}
       </div>
     </div>
   );
@@ -1828,17 +1280,11 @@ function TopUpSheet({ onPick, payingPackage, onClose }) {
             const isPaying = payingPackage === p.key;
             const disabled = payingPackage && !isPaying;
             return (
-              <button
-                key={p.key}
-                onClick={() => !payingPackage && onPick(p.key)}
-                style={{ ...styles.topupCard, opacity: disabled ? 0.4 : 1, cursor: payingPackage ? 'default' : 'pointer' }}
-              >
+              <button key={p.key} onClick={() => !payingPackage && onPick(p.key)} style={{ ...styles.topupCard, opacity: disabled ? 0.4 : 1, cursor: payingPackage ? 'default' : 'pointer' }}>
                 {p.badge && <div style={styles.topupBadge}>{p.badge}</div>}
                 <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 18, fontWeight: 600, color: '#E8C468', display: 'flex', alignItems: 'center', gap: 5 }}><Icon src={ICON_COIN} size={17} /> {p.coins.toLocaleString('en-US')}</div>
                 <div style={{ fontSize: 10.5, color: '#8FA69C', marginTop: 3 }}>{p.note}</div>
-                <div style={{ fontSize: 12, color: '#4AFFB0', marginTop: 6, fontWeight: 600 }}>
-                  {isPaying ? 'Opening…' : `⭐ ${p.stars}`}
-                </div>
+                <div style={{ fontSize: 12, color: '#4AFFB0', marginTop: 6, fontWeight: 600 }}>{isPaying ? 'Opening…' : `⭐ ${p.stars}`}</div>
               </button>
             );
           })}
@@ -1877,6 +1323,91 @@ function ExchangeSheet({ gems, rate, onPick, onClose }) {
   );
 }
 
+function RewardBurst({ effect, onDone }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 1400);
+    return () => clearTimeout(t);
+  }, [onDone]);
+
+  const icon = effect.icon === 'gem' ? ICON_GEM : ICON_COIN;
+  const particles = Array.from({ length: 10 }, (_, i) => i);
+
+  return (
+    <div style={styles.burstBackdrop}>
+      <div style={{ position: 'relative', width: 160, height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {particles.map((i) => {
+          const angle = (360 / particles.length) * i;
+          return (
+            <div
+              key={i}
+              className="kk-burst-particle"
+              style={{ position: 'absolute', width: 6, height: 6, borderRadius: '50%', background: effect.icon === 'gem' ? '#4AFFB0' : '#E8C468', '--angle': `${angle}deg`, animationDelay: `${i * 0.02}s` }}
+            />
+          );
+        })}
+        <div className="kk-burst-icon" style={{ position: 'relative', zIndex: 2 }}>
+          <img src={icon} alt="" style={{ width: 88, height: 88, objectFit: 'contain', filter: `drop-shadow(0 0 24px ${effect.icon === 'gem' ? 'rgba(74,255,176,0.6)' : 'rgba(232,196,104,0.6)'})` }} />
+        </div>
+        {effect.amount > 0 && (
+          <div className="kk-burst-label" style={styles.burstLabel}>+{effect.amount.toLocaleString('en-US')}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const TUTORIAL_STEPS = [
+  { emoji: '🌱', title: 'Welcome to Crypto Farm', body: 'Plant crypto-themed crops, let them grow, then harvest for coins. No guessing, no risk — every harvest pays out.' },
+  { emoji: '🌾', title: '1. Plant a seed', body: 'Go to the Market tab, buy a seed with coins. It grows on its own over time — even while the app is closed, so check back later.' },
+  { emoji: '🎯', title: '2. Harvest', body: 'When a plot shows HARVEST, tap it to collect your reward right away. Bigger, pricier seeds grow slower but pay out more.' },
+  { emoji: '⚡', title: 'High Demand events', body: "Watch the ticker for ⚡ High Demand — harvesting a matching crop while it's active gives an automatic bonus, no extra steps needed." },
+  { emoji: '⭐', title: 'Level up & achievements', body: 'Every harvest earns XP — leveling up unlocks more farm plots (up to 9). Achievements hand out bonus gems. Check the Board tab for the leaderboard and your referral code.' },
+];
+
+function TutorialModal({ onClose }) {
+  const [step, setStep] = useState(0);
+  const isLast = step === TUTORIAL_STEPS.length - 1;
+  const current = TUTORIAL_STEPS[step];
+  return (
+    <div style={styles.sheetBackdrop}>
+      <div style={{ ...styles.sheet, paddingBottom: 24 }}>
+        <div style={styles.sheetHandle} />
+        <div style={{ textAlign: 'center', padding: '8px 8px 4px' }}>
+          <div style={{ fontSize: 46, marginBottom: 10 }}>{current.emoji}</div>
+          <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 18, marginBottom: 10 }}>{current.title}</div>
+          <div style={{ fontSize: 13, color: '#8FA69C', lineHeight: 1.6, padding: '0 4px' }}>{current.body}</div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, margin: '20px 0' }}>
+          {TUTORIAL_STEPS.map((_, i) => (
+            <div key={i} style={{ width: i === step ? 18 : 6, height: 6, borderRadius: 100, background: i === step ? '#4AFFB0' : '#223530', transition: 'all 0.2s ease' }} />
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 10 }}>
+          {step > 0 && (
+            <button onClick={() => setStep((s) => s - 1)} style={{ ...styles.btnGhost, flex: 1 }}>Back</button>
+          )}
+          <button onClick={() => (isLast ? onClose() : setStep((s) => s + 1))} style={{ ...styles.btnMint, flex: step > 0 ? 1 : undefined, width: step > 0 ? undefined : '100%', padding: '11px 0' }}>
+            {isLast ? "Let's play!" : 'Next'}
+          </button>
+        </div>
+        {!isLast && (
+          <div style={{ textAlign: 'center', marginTop: 12 }}>
+            <span onClick={onClose} style={{ fontSize: 11.5, color: '#5C7268', cursor: 'pointer', textDecoration: 'underline' }}>Skip</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function fmtCountdown(ms) {
+  if (ms <= 0) return '00:00';
+  const totalSec = Math.ceil(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
 /* ---------------- Styles ---------------- */
 const styles = {
   body: { background: 'radial-gradient(ellipse 120% 80% at 50% -10%, #16241F 0%, #0B1210 55%)', color: '#EAF3EE', fontFamily: "'Inter', sans-serif", display: 'flex', justifyContent: 'center', minHeight: '100vh' },
@@ -1888,8 +1419,8 @@ const styles = {
   brandSub: { fontSize: 10, color: '#5C7268', fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase', marginTop: -1 },
   pill: { display: 'flex', alignItems: 'center', gap: 6, background: '#131F1B', border: '1px solid #223530', padding: '7px 11px 7px 8px', borderRadius: 100, fontFamily: "'IBM Plex Mono', monospace", fontSize: 12.5, fontWeight: 600 },
   dot: { width: 16, height: 16, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10 },
+  helpBtn: { width: 26, height: 26, borderRadius: '50%', background: '#131F1B', border: '1px solid #223530', color: '#8FA69C', fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   ticker: { margin: '8px 18px 4px', background: '#131F1B', border: '1px solid #223530', borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, position: 'relative', zIndex: 2, overflow: 'hidden' },
-  tickerLabel: { fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#5C7268', fontWeight: 600, whiteSpace: 'nowrap' },
   tickerTfBtn: { background: 'transparent', border: '1px solid #223530', color: '#5C7268', fontFamily: "'IBM Plex Mono', monospace", fontSize: 9.5, fontWeight: 600, padding: '3px 7px', borderRadius: 6, cursor: 'pointer', transition: 'all 0.15s ease' },
   tickerTfBtnActive: { borderColor: '#4AFFB0', color: '#06231A', background: '#4AFFB0', fontWeight: 700 },
   sectionHead: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '22px 18px 10px', position: 'relative', zIndex: 2 },
@@ -1899,7 +1430,6 @@ const styles = {
   streakBar: { display: 'flex', alignItems: 'center', gap: 10, margin: '10px 18px 0', background: 'linear-gradient(135deg, rgba(232,196,104,0.12), rgba(74,255,176,0.08))', border: '1px solid #3A3020', borderRadius: 14, padding: '10px 14px', position: 'relative', zIndex: 2 },
   levelBar: { display: 'flex', alignItems: 'center', gap: 10, margin: '10px 18px 0', background: '#131F1B', border: '1px solid #223530', borderRadius: 14, padding: '10px 14px', position: 'relative', zIndex: 2 },
   levelBadge: { fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 13, color: '#06231A', background: '#4AFFB0', borderRadius: 8, padding: '4px 9px', flexShrink: 0 },
-  helpBtn: { width: 26, height: 26, borderRadius: '50%', background: '#131F1B', border: '1px solid #223530', color: '#8FA69C', fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   xpTrack: { width: '100%', height: 6, background: '#182B25', borderRadius: 100, overflow: 'hidden' },
   xpFill: { height: '100%', background: 'linear-gradient(90deg, #2A6B54, #4AFFB0)', borderRadius: 100, transition: 'width 0.5s ease' },
   eventBadge: { background: 'linear-gradient(135deg, rgba(232,196,104,0.15), rgba(255,107,92,0.08))', border: '1px solid #4A3A20', borderRadius: 10, padding: '8px 12px', fontSize: 11, color: '#E8C468', marginBottom: 10, lineHeight: 1.4 },
@@ -1911,15 +1441,14 @@ const styles = {
   seasonalCard: { display: 'flex', alignItems: 'center', gap: 12, background: 'linear-gradient(135deg, rgba(232,196,104,0.12), rgba(74,255,176,0.05))', border: '1px solid #4A3A20', borderRadius: 18, padding: '14px 16px' },
   listRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 0' },
   seedRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 0', borderTop: '1px solid #1B2823' },
-  seedRowCol: { padding: '10px 0', borderTop: '1px solid #1B2823' },
   rowIcon: { fontSize: 20, width: 38, height: 38, background: '#182B25', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   rowIconSm: { fontSize: 16, width: 32, height: 32, background: '#182B25', borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  btnGhostSm: { background: '#182B25', color: '#EAF3EE', border: '1px solid #223530', borderRadius: 10, padding: '6px 10px', fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 10.5, cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' },
-  codeInput: { flex: 1, background: '#182B25', border: '1px solid #223530', borderRadius: 10, padding: '9px 12px', fontFamily: "'IBM Plex Mono', monospace", fontSize: 12.5, color: '#EAF3EE', outline: 'none' },
   rowTitle: { fontSize: 13, fontWeight: 600 },
   rowSub: { fontSize: 10.5, color: '#5C7268', fontFamily: "'IBM Plex Mono', monospace", marginTop: 1 },
   btnGhost: { background: '#182B25', color: '#EAF3EE', border: '1px solid #223530', borderRadius: 12, padding: '7px 12px', fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 11.5, cursor: 'pointer' },
+  btnGhostSm: { background: '#182B25', color: '#EAF3EE', border: '1px solid #223530', borderRadius: 10, padding: '6px 10px', fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 10.5, cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' },
   btnMint: { background: '#4AFFB0', color: '#06231A', border: 'none', borderRadius: 12, padding: '9px 14px', fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 12.5, cursor: 'pointer' },
+  codeInput: { flex: 1, background: '#182B25', border: '1px solid #223530', borderRadius: 10, padding: '9px 12px', fontFamily: "'IBM Plex Mono', monospace", fontSize: 12.5, color: '#EAF3EE', outline: 'none' },
   balanceHero: { margin: '4px 18px 8px', background: 'linear-gradient(150deg, #16302A 0%, #0F211D 100%)', border: '1px solid #223530', borderRadius: 22, padding: '22px 20px', position: 'relative', overflow: 'hidden' },
   bottomNav: { marginTop: 'auto', display: 'flex', justifyContent: 'space-around', padding: '12px 10px 20px', background: 'linear-gradient(180deg, rgba(19,31,27,0) 0%, #101B17 30%)', borderTop: '1px solid #223530', position: 'sticky', bottom: 0, zIndex: 10 },
   navItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 600, padding: '4px 14px', position: 'relative', cursor: 'pointer', background: 'none', border: 'none', fontFamily: "'Inter', sans-serif" },
@@ -1932,7 +1461,6 @@ const styles = {
   burstLabel: { position: 'absolute', bottom: -6, left: '50%', transform: 'translateX(-50%)', fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 20, color: '#E8C468', textShadow: '0 0 16px rgba(232,196,104,0.7)', whiteSpace: 'nowrap' },
   sheetHandle: { width: 36, height: 4, background: '#223530', borderRadius: 10, margin: '0 auto 18px' },
   closeBtn: { width: 28, height: 28, borderRadius: '50%', background: '#182B25', border: '1px solid #223530', color: '#8FA69C', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  predictBtn: { flex: 1, padding: '16px 0', borderRadius: 14, border: '1px solid #223530', background: '#182B25', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 14, cursor: 'pointer', color: '#EAF3EE' },
   tfBtn: { flex: 1, padding: '10px 0', borderRadius: 12, border: '1px solid #223530', background: '#182B25', color: '#8FA69C', fontFamily: "'IBM Plex Mono', monospace", fontWeight: 600, fontSize: 12, cursor: 'pointer', transition: 'all 0.15s ease' },
   tfBtnActive: { borderColor: '#4AFFB0', color: '#06231A', background: '#4AFFB0', fontWeight: 700 },
   topupCard: { position: 'relative', background: '#182B25', border: '1px solid #223530', borderRadius: 14, padding: '16px 12px', textAlign: 'left', cursor: 'pointer' },
