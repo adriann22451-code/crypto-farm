@@ -312,6 +312,7 @@ export default function KebunKripto() {
   const dailyBonusChecked = useRef(false);
   const [screen, setScreen] = useState('kebun');
   const [showTutorial, setShowTutorial] = useState(false);
+  const [rewardEffect, setRewardEffect] = useState(null); // { icon: 'coin'|'gem', amount } | null
   const tutorialChecked = useRef(false);
   const [now, setNow] = useState(Date.now());
   const animatedCoins = useCountUp(state.coins);
@@ -659,6 +660,8 @@ export default function KebunKripto() {
         setPayingPackage(null);
         if (status === 'paid') {
           showToast('✓ Payment received! Updating your balance…');
+          const packageCoins = { small: 100, medium: 300, large: 750, jumbo: 2000 };
+          setRewardEffect({ icon: 'coin', amount: packageCoins[packageKey] || 0 });
           // The webhook is the one that actually credited the coins — pull
           // the freshly updated state back down instead of trusting the
           // client to know the new balance.
@@ -699,6 +702,7 @@ export default function KebunKripto() {
     }));
     setWalletSheet(null);
     showToast(`✓ ${gemAmount} gems exchanged for ${coinsGained} coins`);
+    setRewardEffect({ icon: 'coin', amount: coinsGained });
   }
 
   function buyDirect(cropId) {
@@ -816,6 +820,29 @@ export default function KebunKripto() {
           100% { transform: translateX(-50%); }
         }
         .kk-ticker-track { animation: kkTickerScroll 16s linear infinite; }
+        @keyframes kkBurstIconPop {
+          0% { transform: scale(0.3); opacity: 0; }
+          50% { transform: scale(1.15); opacity: 1; }
+          70% { transform: scale(0.95); }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes kkBurstParticle {
+          0% { opacity: 1; transform: rotate(var(--angle, 0deg)) translateY(0px); }
+          100% { opacity: 0; transform: rotate(var(--angle, 0deg)) translateY(-70px); }
+        }
+        @keyframes kkBurstFadeOut {
+          0%, 65% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+        @keyframes kkBurstLabelRise {
+          0% { transform: translateY(10px); opacity: 0; }
+          40% { transform: translateY(0); opacity: 1; }
+          80% { opacity: 1; }
+          100% { transform: translateY(-8px); opacity: 0; }
+        }
+        .kk-burst-icon { animation: kkBurstIconPop 0.5s cubic-bezier(.2,.9,.3,1.4) both, kkBurstFadeOut 1.4s ease both; }
+        .kk-burst-particle { animation: kkBurstParticle 0.7s ease-out both; }
+        .kk-burst-label { animation: kkBurstLabelRise 1.3s ease both; }
         button { outline: none; -webkit-tap-highlight-color: transparent; }
         button:focus { outline: none; }
       `}</style>
@@ -933,6 +960,8 @@ export default function KebunKripto() {
       {walletSheet === 'exchange' && <ExchangeSheet gems={state.gems} rate={GEM_RATE} onPick={exchangeGems} onClose={() => setWalletSheet(null)} />}
 
       {showTutorial && <TutorialModal onClose={() => setShowTutorial(false)} />}
+
+      {rewardEffect && <RewardBurst effect={rewardEffect} onDone={() => setRewardEffect(null)} />}
 
       {toast && <div style={styles.toast}>{toast}</div>}
     </div>
@@ -1457,6 +1486,49 @@ const TUTORIAL_STEPS = [
   },
 ];
 
+function RewardBurst({ effect, onDone }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 1400);
+    return () => clearTimeout(t);
+  }, [onDone]);
+
+  const icon = effect.icon === 'gem' ? ICON_GEM : ICON_COIN;
+  const particles = Array.from({ length: 10 }, (_, i) => i);
+
+  return (
+    <div style={styles.burstBackdrop}>
+      <div style={{ position: 'relative', width: 160, height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {particles.map((i) => {
+          const angle = (360 / particles.length) * i;
+          return (
+            <div
+              key={i}
+              className="kk-burst-particle"
+              style={{
+                position: 'absolute',
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: effect.icon === 'gem' ? '#4AFFB0' : '#E8C468',
+                '--angle': `${angle}deg`,
+                animationDelay: `${i * 0.02}s`,
+              }}
+            />
+          );
+        })}
+        <div className="kk-burst-icon" style={{ position: 'relative', zIndex: 2 }}>
+          <img src={icon} alt="" style={{ width: 88, height: 88, objectFit: 'contain', filter: `drop-shadow(0 0 24px ${effect.icon === 'gem' ? 'rgba(74,255,176,0.6)' : 'rgba(232,196,104,0.6)'})` }} />
+        </div>
+        {effect.amount > 0 && (
+          <div className="kk-burst-label" style={styles.burstLabel}>
+            +{effect.amount.toLocaleString('en-US')}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function TutorialModal({ onClose }) {
   const [step, setStep] = useState(0);
   const isLast = step === TUTORIAL_STEPS.length - 1;
@@ -1744,9 +1816,8 @@ function TopUpSheet({ onPick, payingPackage, onClose }) {
     { key: 'jumbo', coins: 2000, stars: 250, note: 'Jumbo Pack' },
   ];
   return (
-    <div style={styles.sheetBackdrop} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div style={styles.sheet}>
-        <div style={styles.sheetHandle} />
+    <div style={styles.modalBackdrop} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={styles.modalCard}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
           <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 17 }}>Top Up Coins</div>
           <button onClick={onClose} style={styles.closeBtn}>✕</button>
@@ -1780,9 +1851,8 @@ function TopUpSheet({ onPick, payingPackage, onClose }) {
 function ExchangeSheet({ gems, rate, onPick, onClose }) {
   const options = [1, 5, 10, gems].filter((v, i, arr) => v > 0 && arr.indexOf(v) === i).sort((a, b) => a - b);
   return (
-    <div style={styles.sheetBackdrop} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div style={styles.sheet}>
-        <div style={styles.sheetHandle} />
+    <div style={styles.modalBackdrop} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={styles.modalCard}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
           <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 17 }}>Exchange Gems</div>
           <button onClick={onClose} style={styles.closeBtn}>✕</button>
@@ -1856,6 +1926,10 @@ const styles = {
   navIndicator: { position: 'absolute', top: -13, left: '50%', transform: 'translateX(-50%)', width: 18, height: 2.5, background: '#4AFFB0', borderRadius: 4, boxShadow: '0 0 8px rgba(74,255,176,0.6)' },
   sheetBackdrop: { position: 'fixed', inset: 0, background: 'rgba(4,8,7,0.7)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 50 },
   sheet: { width: '100%', maxWidth: 430, background: '#131F1B', borderTop: '1px solid #223530', borderRadius: '24px 24px 0 0', padding: '22px 20px calc(26px + env(safe-area-inset-bottom))' },
+  modalBackdrop: { position: 'fixed', inset: 0, background: 'rgba(4,8,7,0.7)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: '0 20px' },
+  modalCard: { width: '100%', maxWidth: 400, background: '#131F1B', border: '1px solid #223530', borderRadius: 22, padding: '22px 20px 24px' },
+  burstBackdrop: { position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 80, pointerEvents: 'none' },
+  burstLabel: { position: 'absolute', bottom: -6, left: '50%', transform: 'translateX(-50%)', fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 20, color: '#E8C468', textShadow: '0 0 16px rgba(232,196,104,0.7)', whiteSpace: 'nowrap' },
   sheetHandle: { width: 36, height: 4, background: '#223530', borderRadius: 10, margin: '0 auto 18px' },
   closeBtn: { width: 28, height: 28, borderRadius: '50%', background: '#182B25', border: '1px solid #223530', color: '#8FA69C', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   predictBtn: { flex: 1, padding: '16px 0', borderRadius: 14, border: '1px solid #223530', background: '#182B25', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: 14, cursor: 'pointer', color: '#EAF3EE' },
