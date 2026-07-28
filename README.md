@@ -89,15 +89,19 @@ to actually trigger it.
 
 **⚠️ Important Vercel Hobby (free) plan limitation:** Vercel's free plan
 only allows Cron Jobs to run **once per day**, which is far too infrequent —
-predictions can resolve in as little as 1 minute. The `vercel.json` in this
-project is configured for every 5 minutes, which **requires a Vercel Pro
-plan** to actually run that often. If you're on the free Hobby plan, use the
-external pinger option below instead.
+predictions can resolve in as little as 1 minute. `vercel.json` in this
+project does **not** include a `crons` block by default, because Vercel
+rejects the entire deployment if it finds a sub-daily schedule on a Hobby
+account. If you're on Hobby, skip straight to Option B below.
 
 ### Option A — Vercel Pro
 1. Make sure `CRON_SECRET` is set in your environment variables.
-2. Deploy — Vercel automatically calls `/api/cron-resolve` every 5 minutes
-   per `vercel.json`, with its own auth, no further setup needed.
+2. Add this to `vercel.json`:
+   ```json
+   "crons": [{ "path": "/api/cron-resolve", "schedule": "*/5 * * * *" }]
+   ```
+3. Deploy — Vercel automatically calls `/api/cron-resolve` every 5 minutes,
+   with its own auth, no further setup needed.
 
 ### Option B — Free external pinger (works on Vercel Hobby)
 1. Make sure `CRON_SECRET` is set in your environment variables and
