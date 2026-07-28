@@ -54,10 +54,6 @@ export default async function handler(req, res) {
       if (shared && prefix) {
         await redis.sadd(`sharedidx:${prefix}`, key);
       }
-      if (!shared && key === 'kebun-kripto-state-v3') {
-        // so the resolution cron job knows which uids to check
-        await redis.sadd('idx:allUsers', uid);
-      }
       return res.status(200).json({ key, value, shared: !!shared });
     }
 
