@@ -706,6 +706,29 @@ export default function KebunKripto() {
           100% { transform: translateX(-50%); }
         }
         .kk-ticker-track { animation: kkTickerScroll 16s linear infinite; }
+        @keyframes kkFireflyDrift {
+          0% { transform: translate(0, 0); }
+          25% { transform: translate(calc(var(--drift, 20px) * 0.6), calc(var(--drift, 20px) * -0.8)); }
+          50% { transform: translate(calc(var(--drift, 20px) * -0.4), calc(var(--drift, 20px) * -0.3)); }
+          75% { transform: translate(calc(var(--drift, 20px) * 0.3), calc(var(--drift, 20px) * 0.6)); }
+          100% { transform: translate(0, 0); }
+        }
+        @keyframes kkFireflyTwinkle {
+          0%, 100% { opacity: 0.15; }
+          50% { opacity: 0.9; }
+        }
+        .kk-firefly { animation-name: kkFireflyDrift, kkFireflyTwinkle; animation-timing-function: ease-in-out, ease-in-out; animation-iteration-count: infinite, infinite; }
+        @keyframes kkPlantSway {
+          0%, 100% { transform: rotate(-3deg); }
+          50% { transform: rotate(3deg); }
+        }
+        .kk-plant-sway { display: inline-block; transform-origin: bottom center; animation: kkPlantSway 3.4s ease-in-out infinite; }
+        @keyframes kkHarvestPop {
+          0% { transform: scale(1) translateY(0); opacity: 1; }
+          35% { transform: scale(1.35) translateY(-6px); opacity: 1; }
+          100% { transform: scale(0.3) translateY(-30px); opacity: 0; }
+        }
+        .kk-harvest-pop { animation: kkHarvestPop 0.42s cubic-bezier(.3,.6,.4,1) both; }
         button { outline: none; -webkit-tap-highlight-color: transparent; }
         button:focus { outline: none; }
         @keyframes kkBurstIconPop {
@@ -904,63 +927,121 @@ function LevelBar({ levelInfo }) {
   );
 }
 
+function FireflyLayer({ count = 14 }) {
+  const fireflies = React.useMemo(
+    () =>
+      Array.from({ length: count }, (_, i) => ({
+        id: i,
+        left: Math.random() * 100,
+        top: 10 + Math.random() * 80,
+        size: 2 + Math.random() * 2.5,
+        duration: 6 + Math.random() * 6,
+        delay: Math.random() * 6,
+        drift: 20 + Math.random() * 40,
+      })),
+    [count]
+  );
+  return (
+    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
+      {fireflies.map((f) => (
+        <div
+          key={f.id}
+          className="kk-firefly"
+          style={{
+            position: 'absolute',
+            left: `${f.left}%`,
+            top: `${f.top}%`,
+            width: f.size,
+            height: f.size,
+            borderRadius: '50%',
+            background: '#4AFFB0',
+            boxShadow: '0 0 6px 2px rgba(74,255,176,0.7)',
+            '--drift': `${f.drift}px`,
+            animationDuration: `${f.duration}s, ${2.5 + Math.random() * 2}s`,
+            animationDelay: `${f.delay}s, ${f.delay}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function FarmScreen({ plots, now, unlockedPlots, plotProgress, onEmptyClick, onHarvest }) {
   const filled = plots.filter((p) => p.cropId).length;
+  const [harvestingId, setHarvestingId] = useState(null);
+
+  function triggerHarvest(plot) {
+    if (harvestingId !== null) return;
+    setHarvestingId(plot.id);
+    setTimeout(() => {
+      onHarvest(plot);
+      setHarvestingId(null);
+    }, 420);
+  }
+
   return (
     <>
       <div style={styles.sectionHead}>
         <div style={styles.sectionTitle}>Your Farm</div>
         <div style={styles.sectionMeta}>{filled} / {unlockedPlots} plots</div>
       </div>
-      <div style={styles.farmGrid}>
-        {plots.map((plot) => {
-          const locked = plot.id >= unlockedPlots;
-          if (locked) {
-            const levelNeeded = LEVELS.find((l) => l.plots > plot.id)?.level ?? 6;
+      <div style={{ position: 'relative' }}>
+        <FireflyLayer />
+        <div style={{ ...styles.farmGrid, position: 'relative', zIndex: 1 }}>
+          {plots.map((plot) => {
+            const locked = plot.id >= unlockedPlots;
+            if (locked) {
+              const levelNeeded = LEVELS.find((l) => l.plots > plot.id)?.level ?? 6;
+              return (
+                <div key={plot.id} style={{ ...styles.soilMound, opacity: 0.4, filter: 'saturate(0.3)' }}>
+                  <Icon src={ICON_LOCK} size={20} />
+                  <div style={{ fontSize: 9, color: '#5C7268', marginTop: 4, textAlign: 'center' }}>Requires Level {levelNeeded}</div>
+                </div>
+              );
+            }
+            const prog = plotProgress(plot);
+            if (!prog) {
+              return (
+                <div key={plot.id} style={styles.soilMound} onClick={() => onEmptyClick(plot.id)}>
+                  <div className="kk-empty-plus" style={{ fontSize: 22, color: '#5C7268', fontWeight: 300 }}>+</div>
+                  <div style={{ fontSize: 9.5, color: '#5C7268', marginTop: 4 }}>Plant</div>
+                </div>
+              );
+            }
+            const growScale = prog.ready ? 1 : 0.5 + (prog.pct / 100) * 0.5;
+            const growOpacity = prog.ready ? 1 : 0.5 + (prog.pct / 100) * 0.5;
+            const isHarvesting = harvestingId === plot.id;
+            const canSway = prog.pct > 15 && !prog.ready;
             return (
-              <div key={plot.id} style={{ ...styles.plot, borderStyle: 'dashed', opacity: 0.45 }}>
-                <Icon src={ICON_LOCK} size={20} />
-                <div style={{ fontSize: 9, color: '#5C7268', marginTop: 4, textAlign: 'center' }}>Requires Level {levelNeeded}</div>
-              </div>
-            );
-          }
-          const prog = plotProgress(plot);
-          if (!prog) {
-            return (
-              <div key={plot.id} style={{ ...styles.plot, borderStyle: 'dashed' }} onClick={() => onEmptyClick(plot.id)}>
-                <div className="kk-empty-plus" style={{ fontSize: 22, color: '#5C7268', fontWeight: 300 }}>+</div>
-                <div style={{ fontSize: 9.5, color: '#5C7268', marginTop: 4 }}>Plant</div>
-              </div>
-            );
-          }
-          const growScale = prog.ready ? 1 : 0.55 + (prog.pct / 100) * 0.45;
-          const growOpacity = prog.ready ? 1 : 0.45 + (prog.pct / 100) * 0.55;
-          return (
-            <div
-              key={plot.id}
-              className={prog.ready ? 'kk-ready-plot' : ''}
-              style={{ ...styles.plot, ...(prog.ready ? styles.plotReady : {}) }}
-              onClick={() => prog.ready && onHarvest(plot)}
-            >
-              <Sparkline assetId={prog.crop.asset} now={now} />
               <div
-                style={{
-                  fontSize: 30,
-                  position: 'relative',
-                  zIndex: 2,
-                  filter: 'drop-shadow(0 0 10px rgba(74,255,176,0.35))',
-                  transform: `scale(${growScale})`,
-                  opacity: growOpacity,
-                  transition: 'transform 0.4s ease, opacity 0.4s ease',
-                }}
+                key={plot.id}
+                className={prog.ready && !isHarvesting ? 'kk-ready-plot' : ''}
+                style={{ ...styles.soilMound, ...(prog.ready ? styles.soilMoundReady : {}) }}
+                onClick={() => prog.ready && !isHarvesting && triggerHarvest(plot)}
               >
-                {prog.crop.icon}
+                <div
+                  className={isHarvesting ? 'kk-harvest-pop' : ''}
+                  style={{
+                    transform: `scale(${growScale})`,
+                    opacity: growOpacity,
+                    transition: 'transform 0.4s ease, opacity 0.4s ease',
+                    position: 'relative',
+                    zIndex: 2,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                  }}
+                >
+                  <div className={canSway ? 'kk-plant-sway' : ''} style={{ fontSize: 30, filter: 'drop-shadow(0 0 10px rgba(74,255,176,0.35))' }}>
+                    {prog.crop.icon}
+                  </div>
+                  <div style={{ fontSize: 10, fontWeight: 600, marginTop: 6, color: '#8FA69C' }}>{prog.crop.name}</div>
+                </div>
+                {prog.ready ? <div className="kk-ready-badge" style={styles.readyBadge}>Harvest</div> : <div style={styles.plotTimer}>{prog.pct}%</div>}
               </div>
-              <div style={{ fontSize: 10, fontWeight: 600, marginTop: 6, position: 'relative', zIndex: 2, color: '#8FA69C' }}>{prog.crop.name}</div>
-              {prog.ready ? <div className="kk-ready-badge" style={styles.readyBadge}>Harvest</div> : <div style={styles.plotTimer}>{prog.pct}%</div>}
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </>
   );
@@ -1549,6 +1630,21 @@ const styles = {
   eventBadge: { background: 'linear-gradient(135deg, rgba(232,196,104,0.15), rgba(255,107,92,0.08))', border: '1px solid #4A3A20', borderRadius: 10, padding: '8px 12px', fontSize: 11, color: '#E8C468', marginBottom: 10, lineHeight: 1.4 },
   plot: { aspectRatio: 0.92, background: '#131F1B', border: '1px solid #223530', borderRadius: 18, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' },
   plotReady: { borderColor: '#4AFFB0' },
+  soilMound: {
+    aspectRatio: 0.92,
+    background: 'radial-gradient(ellipse at 50% 85%, #1C2E24 0%, #131F1B 60%, #0F1815 100%)',
+    border: '1px solid #223530',
+    borderRadius: '42% 42% 34% 34% / 50% 50% 30% 30%',
+    position: 'relative',
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+    boxShadow: 'inset 0 -8px 14px rgba(0,0,0,0.35)',
+  },
+  soilMoundReady: { borderColor: '#4AFFB0' },
   readyBadge: { position: 'absolute', bottom: 8, left: '50%', background: '#4AFFB0', color: '#06231A', fontSize: 9, fontWeight: 700, letterSpacing: '0.03em', padding: '3px 9px', borderRadius: 100, textTransform: 'uppercase', zIndex: 3 },
   plotTimer: { fontFamily: "'IBM Plex Mono', monospace", fontSize: 9.5, color: '#5C7268', position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)', zIndex: 3 },
   card: { background: '#131F1B', border: '1px solid #223530', borderRadius: 18, padding: '14px 16px' },
