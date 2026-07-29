@@ -86,7 +86,38 @@ setup step is needed so Telegram knows where to send payment events:
 
 If you ever need to check the webhook status: `https://api.telegram.org/bot<BOT_TOKEN>/getWebhookInfo`
 
-## 6. 1-tap referral sharing (deep link)
+## 6. Enable TON wallet payments (Top Up, alternative to Stars)
+
+Top Up now offers a second payment method — paying directly from a TON
+wallet (Tonkeeper, etc.) instead of Telegram Stars. Same one-way purchase:
+pay TON, receive virtual coins. No withdrawal, ever.
+
+1. Get a TON wallet address to receive payments into — any wallet app
+   (Tonkeeper, Tonhub, MyTonWallet) can give you one for free.
+2. Add `TON_RECEIVE_ADDRESS` to your environment variables (the address from
+   step 1) and redeploy.
+3. Update `public/tonconnect-manifest.json` — replace `url` and `iconUrl`
+   with your actual deployed domain (TON Connect requires this to match).
+4. (Optional) Get a free API key from toncenter.com and set
+   `TONCENTER_API_KEY` — raises the rate limit used to verify payments
+   on-chain. Works fine without one for low traffic.
+5. In the app, go to **Wallet → Top Up → TON tab**, tap **Connect TON
+   Wallet**, approve in your wallet app, then pick a package. Confirm the
+   transaction in your wallet — coins credit automatically once the payment
+   is confirmed on-chain (usually within 10–30 seconds).
+
+### How it works
+
+- The app asks `/api/create-ton-order` for a unique order (amount + a
+  one-time comment used to identify the payment).
+- TonConnect opens your wallet app to sign and broadcast the transaction —
+  the app never touches your wallet's private keys.
+- The app polls `/api/verify-ton-order`, which checks the TON blockchain
+  (via toncenter.com) for a matching incoming transaction before crediting
+  coins — this can't be faked from the client, since coins are only granted
+  after on-chain confirmation.
+
+## 7. 1-tap referral sharing (deep link)
 
 Referral codes can now be shared as a real Telegram link instead of copy-paste
 text.
@@ -102,7 +133,7 @@ text.
 4. The old manual "Enter a friend's code" box is still there too, for people
    who got a code as plain text some other way (e.g. screenshot, voice call).
 
-## 7. Bot commands (/start, /balance, /help)
+## 8. Bot commands (/start, /balance, /help)
 
 The bot now replies to text commands directly in chat — useful for checking
 your balance without even opening the Mini App.
@@ -156,17 +187,22 @@ mereka.
 index.html                 — entry HTML, load SDK Telegram
 src/main.jsx                — inisialisasi Telegram + storage shim, render App
 src/telegram.js              — setup Telegram WebApp SDK, ambil identitas user
+src/tonconnect.js            — TON Connect wallet helper (connect, kirim pembayaran)
 src/storageShim.js           — polyfill window.storage → panggil /api/kv
 src/icons.js                 — icon assets (base64)
 src/App.jsx                  — seluruh game (farm, wallet, leaderboard, dll)
 api/kv.js                    — serverless function: get/set/delete/list ke Redis
 api/create-invoice.js        — bikin link invoice Telegram Stars
+api/create-ton-order.js      — bikin order pembayaran TON
+api/verify-ton-order.js      — verifikasi pembayaran TON on-chain, kredit koin
 api/telegram-webhook.js      — payment webhook + bot commands (/start, /balance, /help)
 api/lib/redis.js             — client Upstash Redis
 api/lib/verifyTelegram.js    — verifikasi HMAC initData Telegram
 api/lib/telegramApi.js       — helper manggil Bot API
 api/lib/credit.js            — kredit koin langsung di Redis (dipakai webhook)
 api/lib/gameData.js          — helper level-info dipakai /balance
+api/lib/ton.js               — query blockchain TON (toncenter) buat verifikasi bayar
+api/lib/tonPackages.js        — daftar harga paket TON
 ```
 
 ## Development lokal
