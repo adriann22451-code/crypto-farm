@@ -1,6 +1,6 @@
 import { redis } from './redis.js';
 
-const STATE_KEY = 'kebun-kripto-state-v3';
+const STATE_KEY = 'kebun-kripto-state-v5';
 
 function stateRedisKey(uid) {
   return `user:${uid}:${STATE_KEY}`;
