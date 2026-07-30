@@ -3,7 +3,7 @@ import { creditCoins, alreadyProcessed, markProcessed } from './lib/credit.js';
 import { redis } from './lib/redis.js';
 import { getLevelInfo } from './lib/gameData.js';
 
-const STATE_KEY = 'kebun-kripto-state-v4';
+const STATE_KEY = 'kebun-kripto-state-v5';
 const MINI_APP_URL = process.env.MINI_APP_URL; // e.g. https://your-app.vercel.app
 
 function openAppButton(label = '🌱 Open Crypto Farm') {
