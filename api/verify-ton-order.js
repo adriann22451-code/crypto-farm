@@ -1,7 +1,7 @@
 import { redis } from './lib/redis.js';
 import { findIncomingTonPayment } from './lib/ton.js';
 
-const STATE_KEY = 'kebun-kripto-state-v4';
+const STATE_KEY = 'kebun-kripto-state-v5';
 
 function stateRedisKey(uid) {
   return `user:${uid}:${STATE_KEY}`;
